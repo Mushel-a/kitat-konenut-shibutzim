@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -395,7 +395,7 @@
     </div>
 
     <div class="tabpane on" id="tab-quota">
-      <div class="small-note">מכסת השעות החודשית האישית (משימות "מוצמדות למכסה" בלבד נספרות). בחודש עם אימון כיתתי אפשר להוריד ל-2.</div>
+      <div class="small-note">מכסת השעות החודשית האישית. כל המשימות נספרות במכסה, למעט שלוש משימות הבט"ש הקבועות ואבטחת בתי כנסת – חגי תשרי. בחודש עם אימון כיתתי אפשר להוריד ל-2.</div>
       <div class="row2">
         <button class="mini-toggle" id="q3" style="flex:1;padding:10px;font-size:13px;">2 שעות (חודש עם אימון)</button>
         <button class="mini-toggle" id="q4" style="flex:1;padding:10px;font-size:13px;">4 שעות (רגיל)</button>
@@ -527,7 +527,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBq5IOpJhlw01qWGCLG2DbCfo5n0EsMB_M",
@@ -543,6 +543,7 @@
   const db = getFirestore(app);
   window.firebaseApp = app;
   window.firebaseDB = db;
+  window.firebaseReady = Promise.resolve(db);
 
   try { window.firebaseAnalytics = getAnalytics(app); } catch(e) { console.warn("Firebase Analytics unavailable", e); }
 </script>
@@ -579,11 +580,11 @@
     {id:"rh",   name:"סיור נוכחות – ערב ראש השנה",           hours:3, quota:true,  date:"2026-09-11", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
     {id:"yk",   name:"סיור נוכחות – ערב יום כיפור",           hours:3, quota:true,  date:"2026-09-20", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
     {id:"suk",  name:"סיור נוכחות – ערב חג הסוכות",           hours:3, quota:true,  date:"2026-09-25", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
-    {id:"thu",  name:"סיור בט\"ש",         hours:3,   quota:true,  date:null, recurring:4, custom:false, fixed:true, time:"21:00", recurStart:null, recurEnd:null, desc:"21:00-00:00"},
-    {id:"fri",  name:"סיור בט\"ש",         hours:2,   quota:true,  date:null, recurring:5, custom:false, fixed:true, time:"10:00", recurStart:null, recurEnd:null, desc:"10:00-12:00"},
-    {id:"mos",  name:"סיור בט\"ש",         hours:2.5, quota:true,  date:null, recurring:6, custom:false, fixed:true, time:"21:30", recurStart:null, recurEnd:null, desc:"21:30-00:00"},
+    {id:"thu",  name:"סיור בט\"ש",         hours:3,   quota:false,  date:null, recurring:4, custom:false, fixed:true, time:"21:00", recurStart:null, recurEnd:null, desc:"21:00-00:00"},
+    {id:"fri",  name:"סיור בט\"ש",         hours:2,   quota:false,  date:null, recurring:5, custom:false, fixed:true, time:"10:00", recurStart:null, recurEnd:null, desc:"10:00-12:00"},
+    {id:"mos",  name:"סיור בט\"ש",         hours:2.5, quota:false,  date:null, recurring:6, custom:false, fixed:true, time:"21:30", recurStart:null, recurEnd:null, desc:"21:30-00:00"},
     {id:"shul", name:"אבטחת בתי כנסת – חגי תשרי",             hours:2, quota:false, date:null, recurring:null, custom:false, time:"19:00", notActivity:true, desc:"התנדבות בלבד – אינה נחשבת כפעילות או משימה רשמית של הכיתה."},
-    {id:"hosh", name:"אבטחת שמחת בית השואבה – סוכות",         hours:2, quota:false, date:null, recurring:null, custom:false, time:"21:00"},
+    {id:"hosh", name:"אבטחת שמחת בית השואבה – סוכות",         hours:2, quota:true, date:null, recurring:null, custom:false, time:"21:00"},
     {id:"chm",  name:"סיור במקומות הומי קהל – חוה\"מ סוכות",  hours:2, quota:true,  date:null, recurring:null, custom:false, time:"19:00"}
   ];
 
@@ -626,140 +627,91 @@
 
   const STORAGE_KEY = "kitat-konenut-schedule-v1";
 
-  function loadState(){
+  let firebaseUnsubscribe = null;
+  let remoteApplying = false;
+  let firebaseReadyOnce = false;
+
+  function applyLocalMigrations(){
+    if(!Array.isArray(state.deletedTaskIds)) state.deletedTaskIds = [];
+    if(!Array.isArray(state.library)) state.library = DEFAULT_LIBRARY.map(x=>({...x}));
+    if(!state.placements) state.placements = {};
+    if(!state.assignments) state.assignments = {};
+    if(!state.hoursOverride) state.hoursOverride = {};
+    if(!state.timeOverride) state.timeOverride = {};
+    DEFAULT_LIBRARY.forEach(def=>{
+      if(state.deletedTaskIds.includes(def.id)) return;
+      if(!state.library.find(t=>t.id===def.id)) state.library.push({...def});
+    });
+    state.library = state.library.filter(t=>t.id!=="vol8");
+    Object.keys(state.placements).forEach(pds=>{
+      state.placements[pds] = (state.placements[pds]||[]).filter(id=>id!=="vol8");
+    });
+    if(!state.appliedMigrations) state.appliedMigrations = [];
+    const pushOnce = x=>{ if(!state.appliedMigrations.includes(x)) state.appliedMigrations.push(x); };
+    if(!state.appliedMigrations.includes("sep2026-holiday-hours")){
+      ["rh","yk","suk"].forEach(id=>{ const t=state.library.find(x=>x.id===id), d=DEFAULT_LIBRARY.find(x=>x.id===id); if(t&&d){t.hours=d.hours;t.time=d.time;} });
+      const t=state.library.find(x=>x.id==="shul"); if(t){t.notActivity=true;if(!t.desc)t.desc="התנדבות בלבד – אינה נחשבת כפעילות או משימה רשמית של הכיתה.";}
+      pushOnce("sep2026-holiday-hours");
+    }
+    if(!state.appliedMigrations.includes("sep2026-weekly-hours")){ ["thu","fri","mos"].forEach(id=>{const t=state.library.find(x=>x.id===id),d=DEFAULT_LIBRARY.find(x=>x.id===id);if(t&&d){t.hours=d.hours;t.time=d.time;}});pushOnce("sep2026-weekly-hours"); }
+    if(!state.appliedMigrations.includes("sep2026-recur-scope")){ ["thu","fri","mos"].forEach(id=>{const t=state.library.find(x=>x.id===id),d=DEFAULT_LIBRARY.find(x=>x.id===id);if(t&&d){t.recurStart=d.recurStart;t.recurEnd=d.recurEnd;}});pushOnce("sep2026-recur-scope"); }
+    if(!state.appliedMigrations.includes("sep2026-desc-hours")){ ["rh","yk","suk","thu","fri","mos"].forEach(id=>{const t=state.library.find(x=>x.id===id),d=DEFAULT_LIBRARY.find(x=>x.id===id);if(t&&d&&!t.desc)t.desc=d.desc;});pushOnce("sep2026-desc-hours"); }
+    if(!state.appliedMigrations.includes("sep2026-thu-fix")){const t=state.library.find(x=>x.id==="thu"),d=DEFAULT_LIBRARY.find(x=>x.id==="thu");if(t&&d){t.hours=d.hours;t.time=d.time;t.desc=d.desc;}pushOnce("sep2026-thu-fix");}
+    if(!state.appliedMigrations.includes("sep2026-fixed-schedules")){["thu","fri","mos"].forEach(id=>{const t=state.library.find(x=>x.id===id),d=DEFAULT_LIBRARY.find(x=>x.id===id);if(t&&d){t.fixed=true;t.hours=d.hours;t.time=d.time;t.desc=d.desc;}});pushOnce("sep2026-fixed-schedules");}
+    if(!state.appliedMigrations.includes("sep2026-holidays-not-fixed")){["rh","yk","suk"].forEach(id=>{const t=state.library.find(x=>x.id===id);if(t)delete t.fixed;});pushOnce("sep2026-holidays-not-fixed");}
+    if(!state.appliedMigrations.includes("sep2026-holiday-times-v2")){const hd={rh:{date:"2026-09-11",hours:3,time:"10:00",desc:"10:00-13:00"},yk:{date:"2026-09-20",hours:3,time:"10:00",desc:"10:00-13:00"},suk:{date:"2026-09-25",hours:3,time:"10:00",desc:"10:00-13:00"}};Object.entries(hd).forEach(([id,d])=>{const t=state.library.find(x=>x.id===id);if(t){Object.assign(t,d);delete t.fixed;}});pushOnce("sep2026-holiday-times-v2");}
+    if(!state.appliedMigrations.includes("iron-schedules-unlimited")){["thu","fri","mos"].forEach(id=>{const t=state.library.find(x=>x.id===id);if(t){t.recurStart=null;t.recurEnd=null;t.fixed=true;}});pushOnce("iron-schedules-unlimited");}
+  }
+
+  async function loadState(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
-      if(raw){
-        const saved = JSON.parse(raw);
-        state = Object.assign({}, state, saved);
-        // bring in any new default tasks added in app updates that the
-        // saved data (from before the update) doesn't have yet
-        if(!Array.isArray(state.deletedTaskIds)) state.deletedTaskIds = [];
-        DEFAULT_LIBRARY.forEach(def=>{
-          if(state.deletedTaskIds.includes(def.id)) return;
-          if(!state.library.find(t=>t.id===def.id)){
-            state.library.push({...def});
-          }
-        });
-
-        // remove the old built-in "8-hour patrol volunteering" task –
-        // replaced by free-form quick-add tasks per day
-        state.library = state.library.filter(t=>t.id!=="vol8");
-        Object.keys(state.placements).forEach(pds=>{
-          state.placements[pds] = state.placements[pds].filter(id=>id!=="vol8");
-        });
-
-        // one-time migrations: apply corrected default hours/times that
-        // were updated after this device's data was first saved, without
-        // clobbering any manual edits made after this point
-        if(!state.appliedMigrations) state.appliedMigrations = [];
-        if(!state.appliedMigrations.includes("sep2026-holiday-hours")){
-          ["rh","yk","suk"].forEach(id=>{
-            const t = state.library.find(x=>x.id===id);
-            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
-            if(t && def){ t.hours = def.hours; t.time = def.time; }
-          });
-          const shulTask = state.library.find(x=>x.id==="shul");
-          if(shulTask){
-            shulTask.notActivity = true;
-            if(!shulTask.desc){
-              shulTask.desc = "התנדבות בלבד – אינה נחשבת כפעילות או משימה רשמית של הכיתה.";
-            }
-          }
-          state.appliedMigrations.push("sep2026-holiday-hours");
-        }
-        if(!state.appliedMigrations.includes("sep2026-weekly-hours")){
-          ["thu","fri","mos"].forEach(id=>{
-            const t = state.library.find(x=>x.id===id);
-            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
-            if(t && def){ t.hours = def.hours; t.time = def.time; }
-          });
-          state.appliedMigrations.push("sep2026-weekly-hours");
-        }
-        if(!state.appliedMigrations.includes("sep2026-recur-scope")){
-          ["thu","fri","mos"].forEach(id=>{
-            const t = state.library.find(x=>x.id===id);
-            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
-            if(t && def){ t.recurStart = def.recurStart; t.recurEnd = def.recurEnd; }
-          });
-          state.appliedMigrations.push("sep2026-recur-scope");
-        }
-        if(!state.appliedMigrations.includes("sep2026-desc-hours")){
-          ["rh","yk","suk","thu","fri","mos"].forEach(id=>{
-            const t = state.library.find(x=>x.id===id);
-            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
-            if(t && def && !t.desc){ t.desc = def.desc; }
-          });
-          state.appliedMigrations.push("sep2026-desc-hours");
-        }
-        if(!state.appliedMigrations.includes("sep2026-thu-fix")){
-          const t = state.library.find(x=>x.id==="thu");
-          const def = DEFAULT_LIBRARY.find(x=>x.id==="thu");
-          if(t && def){ t.hours = def.hours; t.time = def.time; t.desc = def.desc; }
-          state.appliedMigrations.push("sep2026-thu-fix");
-        }
-        if(!state.appliedMigrations.includes("sep2026-fixed-schedules")){
-          ["thu","fri","mos"].forEach(id=>{
-            const t = state.library.find(x=>x.id===id);
-            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
-            if(t && def){
-              t.fixed = true;
-              t.hours = def.hours;
-              t.time = def.time;
-              t.desc = def.desc;
-            }
-          });
-          state.appliedMigrations.push("sep2026-fixed-schedules");
-        }
-        if(!state.appliedMigrations.includes("sep2026-holidays-not-fixed")){
-          ["rh","yk","suk"].forEach(id=>{
-            const t = state.library.find(x=>x.id===id);
-            if(t) delete t.fixed;
-          });
-          state.appliedMigrations.push("sep2026-holidays-not-fixed");
-        }
-        if(!state.appliedMigrations.includes("sep2026-holiday-times-v2")){
-          const holidayDefaults = {
-            rh:  {date:"2026-09-11", hours:3, time:"10:00", desc:"10:00-13:00"},
-            yk:  {date:"2026-09-20", hours:3, time:"10:00", desc:"10:00-13:00"},
-            suk: {date:"2026-09-25", hours:3, time:"10:00", desc:"10:00-13:00"}
-          };
-          Object.entries(holidayDefaults).forEach(([id, def])=>{
-            const t = state.library.find(x=>x.id===id);
-            if(t){
-              t.date = def.date;
-              t.hours = def.hours;
-              t.time = def.time;
-              t.desc = def.desc;
-              delete t.fixed;
-            }
-          });
-          state.appliedMigrations.push("sep2026-holiday-times-v2");
-        }
-        if(!state.appliedMigrations.includes("iron-schedules-unlimited")){
-          ["thu","fri","mos"].forEach(id=>{
-            const t = state.library.find(x=>x.id===id);
-            if(t){ t.recurStart = null; t.recurEnd = null; t.fixed = true; }
-          });
-          state.appliedMigrations.push("iron-schedules-unlimited");
-        }
-      }
-    }catch(e){
-      console.error("שגיאת טעינה", e);
-    }
+      if(raw){ try{ state = Object.assign({}, state, JSON.parse(raw)); }catch(e){ console.warn("שמירת דפדפן פגומה",e); } }
+      applyLocalMigrations();
+    }catch(e){ console.error("שגיאת טעינה מקומית",e); }
     render();
+
+    try{
+      const db = await window.firebaseReady;
+      const ref = doc(db, "schedules", "main");
+      const snap = await getDoc(ref);
+      if(snap.exists() && snap.data().state){
+        remoteApplying = true;
+        state = Object.assign({}, state, snap.data().state);
+        applyLocalMigrations();
+        remoteApplying = false;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        render();
+      }else{
+        await setDoc(ref, {state: JSON.parse(JSON.stringify(state)), updatedAt: serverTimestamp()});
+      }
+      firebaseReadyOnce = true;
+      if(firebaseUnsubscribe) firebaseUnsubscribe();
+      firebaseUnsubscribe = onSnapshot(ref, snap2=>{
+        if(!snap2.exists() || !snap2.data().state || remoteApplying) return;
+        remoteApplying = true;
+        state = Object.assign({}, state, snap2.data().state);
+        applyLocalMigrations();
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+        render();
+        remoteApplying = false;
+      }, err=>{ console.error("שגיאת סנכרון Firebase",err); showSaveWarning(); });
+    }catch(e){
+      console.error("Firebase sync unavailable",e);
+      showSaveWarning();
+    }
   }
 
   function saveState(){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       hideSaveWarning();
-      return true;
-    }catch(e){
-      console.error("שגיאת שמירה", e);
-      showSaveWarning();
-      return false;
+    }catch(e){ console.error("שגיאת שמירה",e); showSaveWarning(); }
+    if(firebaseReadyOnce && !remoteApplying){
+      window.firebaseReady.then(db=>setDoc(doc(db,"schedules","main"), {state: JSON.parse(JSON.stringify(state)), updatedAt: serverTimestamp()}))
+        .catch(e=>{ console.error("שגיאת שמירה ל-Firestore",e); showSaveWarning(); });
     }
+    return true;
   }
 
   function showSaveWarning(){
@@ -887,6 +839,11 @@
     return state.assignments[`${ds}::${taskId}`] || [];
   }
 
+  // כל המשימות נספרות במכסה, למעט שלוש משימות בט"ש קבועות ואבטחת בתי כנסת – חגי תשרי.
+  function countsTowardQuota(t){
+    return !["thu", "fri", "mos", "shul"].includes(t.id);
+  }
+
   function monthHoursForPerson(name){
     let quotaHrs = 0, extraHrs = 0;
     const y = state.year, m = state.month;
@@ -897,7 +854,7 @@
         const names = assignedFor(ds, t.id);
         if(names.includes(name) && !t.notActivity){
           const hrs = effectiveHours(ds, t.id, t.hours);
-          if(t.quota) quotaHrs += hrs;
+          if(countsTowardQuota(t)) quotaHrs += hrs;
           else extraHrs += hrs;
         }
       });
@@ -1714,7 +1671,7 @@
     }
   });
 
-  loadState();
+  loadState().catch(e=>console.error("שגיאת אתחול",e));
 })();
 </script>
 </body>
