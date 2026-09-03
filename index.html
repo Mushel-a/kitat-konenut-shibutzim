@@ -133,7 +133,10 @@
   .overlay{
     position:fixed;inset:0;background:rgba(4,8,13,0.72);
     display:none;align-items:flex-end;justify-content:center;z-index:50;
+    padding:0;box-sizing:border-box;
   }
+  #settingsOverlay{align-items:center;padding:10px;}
+  #settingsOverlay .sheet{max-height:94vh;border-radius:20px;box-sizing:border-box;}
   .overlay.show{display:flex;}
   .sheet{
     width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
@@ -222,9 +225,9 @@
   .mini-toggle{font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;color:var(--steel-dim);}
   .mini-toggle.on{background:rgba(63,121,216,.15);color:var(--blue);border-color:var(--blue-dim);}
 
-  .tabbar{display:flex;gap:6px;margin-bottom:14px;}
-  .tab{flex:1;text-align:center;padding:8px;border-radius:9px;background:var(--panel-2);
-    border:1px solid var(--line);font-size:12.5px;cursor:pointer;color:var(--steel);}
+  .tabbar{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:thin;}
+  .tab{flex:0 0 auto;text-align:center;padding:8px 11px;border-radius:9px;background:var(--panel-2);
+    border:1px solid var(--line);font-size:12.5px;cursor:pointer;color:var(--steel);white-space:nowrap;}
   .tab.on{background:var(--blue);color:#fff;border-color:var(--blue);}
   .tabpane{display:none;}
   .tabpane.on{display:block;}
@@ -434,6 +437,8 @@
           <button class="edit-btn" style="flex:0 0 auto;padding:9px 16px;" id="pinChangeBtn">עדכון</button>
         </div>
       </div>
+    </div>
+
     <div class="tabpane" id="tab-backup">
       <div class="small-note">
         אם השמירה האוטומטית נכשלת (תקלת שרת זמנית), אפשר לגבות את כל הנתונים כטקסט ולשחזר אותם מאוחר יותר – זה לא תלוי בשירות האחסון בכלל.
