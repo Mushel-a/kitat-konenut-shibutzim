@@ -397,7 +397,7 @@
     <div class="tabpane on" id="tab-quota">
       <div class="small-note">מכסת השעות החודשית האישית (משימות "מוצמדות למכסה" בלבד נספרות). בחודש עם אימון כיתתי אפשר להוריד ל-3.</div>
       <div class="row2">
-        <button class="mini-toggle" id="q3" style="flex:1;padding:10px;font-size:13px;">3 שעות (חודש עם אימון)</button>
+        <button class="mini-toggle" id="q2" style="flex:1;padding:10px;font-size:13px;">2 שעות (חודש עם אימון)</button>
         <button class="mini-toggle" id="q4" style="flex:1;padding:10px;font-size:13px;">4 שעות (רגיל)</button>
       </div>
       <div class="field" style="margin-top:12px;">
@@ -465,7 +465,7 @@
         יוצר רשימה קריאה של השיבוצים בחודש המוצג, מוכנה להעתקה ושליחה כהודעת טקסט בוואטסאפ – לא תלוי בשום שרת.
       </div>
       <button class="edit-btn" id="genShareText" style="margin-bottom:10px;">📋 יצירת הודעה מעודכנת</button>
-      <button type="button" class="edit-btn" id="shareWhatsApp" onclick="(function(){var ta=document.getElementById('shareOut');var text=ta&&ta.value?ta.value:(window.buildShareText?window.buildShareText():'');if(ta) ta.value=text;if(!text){alert('לא נוצר טקסט לשיתוף. לחץ קודם על יצירת הודעה מעודכנת.');return;}var url='https://wa.me/?text='+encodeURIComponent(text);window.location.href=url;})()" style="margin-bottom:10px;background:#eaf8ee;border-color:#25d366;color:#128c3a;">🟢 יצירת הודעה ופתיחה בוואטסאפ</button>
+      <button type="button" class="edit-btn" id="shareWhatsApp" style="margin-bottom:10px;background:#eaf8ee;border-color:#25d366;color:#128c3a;">🟢 יצירת הודעה ופתיחה בוואטסאפ</button>
       <textarea id="shareOut" readonly rows="10" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:12px;font-family:inherit;direction:rtl;"></textarea>
       <button class="edit-btn" id="shareCopy" style="margin-top:8px;">העתקת הטקסט</button>
     </div>
@@ -1634,8 +1634,43 @@
       lines.push("");
     }
 
+    // מצב כוח האדם לחודש
+    const noAssignment = [];
+    const belowQuota = [];
+    state.roster.forEach(p=>{
+      const {quotaHrs, extraHrs} = monthHoursForPerson(p.name);
+      const rounded = Math.round(quotaHrs * 10) / 10;
+      const quota = Number(state.quota) || 0;
+      if(rounded === 0){
+        noAssignment.push(p.name);
+      }
+      if(rounded < quota){
+        const gap = Math.round((quota - rounded) * 10) / 10;
+        belowQuota.push({name:p.name, gap, hours:rounded});
+      }
+    });
+
     lines.push("━━━━━━━━━━━━━━");
-    lines.push(`📊 סיכום: ${assigned} שיבוצים | ${missing} חוסרים | ${total} משימות`);
+    lines.push("👥 מצב כוח האדם");
+    if(noAssignment.length){
+      lines.push(`❌ לא השתבצו כלל (${noAssignment.length}):`);
+      noAssignment.forEach(name=>lines.push(`• ${name}`));
+    }else{
+      lines.push("✅ כולם שובצו לפחות פעם אחת");
+    }
+
+    if(belowQuota.length){
+      lines.push("");
+      lines.push(`⚠️ חסר למכסה החודשית (${state.quota} ש׳):`);
+      belowQuota.forEach(p=>lines.push(`• ${p.name}: חסרות ${p.gap} ש׳ (בוצעו ${p.hours} ש׳)`));
+    }else{
+      lines.push("");
+      lines.push(`✅ כולם הגיעו למכסה של ${state.quota} ש׳`);
+    }
+
+    lines.push("");
+    lines.push("━━━━━━━━━━━━━━");
+    lines.push(`📊 סיכום שיבוצים: ${assigned} שיבוצים | ${missing} חוסרים | ${total} משימות`);
     if(missing === 0) lines.push("✅ אין חוסרים בשיבוץ");
     lines.push("");
     lines.push("הודעה נוצרה מתוך מערכת השיבוצים");
