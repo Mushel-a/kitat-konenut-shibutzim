@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>שיבוץ חודשי – כיתת כוננות קריית מלאכי</title>
+<style>
+  :root{
+    --bg:#eef2f7;
+    --panel:#ffffff;
+    --panel-2:#f4f7fb;
+    --line:#dbe3ee;
+    --steel:#48566a;
+    --steel-dim:#8b98a8;
+    --ink:#182534;
+    --blue:#2f5fb8;
+    --blue-dim:#a9c3ea;
+    --blue-btn:#2f5fb8;
+    --green:#2f9e6c;
+    --amber:#c9820e;
+    --red:#c94a4f;
+    --radius:14px;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(ellipse at top, #ffffff 0%, #eef2f7 55%, #e3eaf3 100%);
+    color:var(--ink);
+    font-family:'Assistant', 'Segoe UI', system-ui, sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+
+  .wrap{max-width:520px;margin:0 auto;padding:14px 12px 40px;}
+
+  header.top{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 4px 10px;
+  }
+  header.top .title{
+    display:flex;flex-direction:column;gap:2px;
+  }
+  header.top .title .unit{
+    font-size:12px;letter-spacing:.5px;color:var(--blue);font-weight:700;
+  }
+  header.top .title h1{
+    font-size:19px;margin:0;font-weight:800;color:var(--ink);
+  }
+  .iconbtn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--steel);
+    height:38px;border-radius:11px;font-size:13px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    flex-shrink:0;padding:0 14px;gap:6px;white-space:nowrap;
+  }
+  .iconbtn:active{transform:scale(0.94);}
+
+  .monthbar{
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px 8px;margin-bottom:12px;box-shadow:0 2px 10px rgba(30,50,80,0.06);
+  }
+  .monthbar .m-name{font-size:16px;font-weight:700;}
+  .monthbar .m-sub{font-size:11px;color:var(--steel-dim);margin-top:1px;}
+  .navbtn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    width:32px;height:32px;border-radius:9px;font-size:16px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* calendar */
+  .cal{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:10px;margin-bottom:14px;box-shadow:0 2px 10px rgba(30,50,80,0.06);
+  }
+  .weekdays{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:6px;}
+  .weekdays span{
+    text-align:center;font-size:11px;color:var(--steel-dim);font-weight:700;
+  }
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .day{
+    min-height:78px;border-radius:9px;background:var(--panel-2);
+    border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
+    padding:4px 3px 3px;cursor:pointer;position:relative;overflow:hidden;
+  }
+  .day.blank{visibility:hidden;pointer-events:none;}
+  .day.today{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset;}
+  .day .num{font-size:12px;font-weight:700;color:var(--ink);text-align:center;margin-bottom:2px;}
+  .day-tasks{display:flex;flex-direction:column;gap:1px;align-items:stretch;width:100%;}
+  .day-task-line{
+    display:flex;align-items:center;gap:2px;font-size:7px;line-height:1.25;
+    color:var(--steel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .day-task-line .dot-mini{width:4px;height:4px;border-radius:50%;flex-shrink:0;}
+  .day-task-line .dot-mini.ok{background:var(--green);}
+  .day-task-line .dot-mini.warn{background:var(--amber);}
+  .day-more{font-size:7px;color:var(--steel-dim);text-align:center;margin-top:1px;}
+  .day-task-hours{font-size:6.5px;color:var(--steel-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 0 2px 6px;}
+  .badge-empty{width:5px;height:5px;border-radius:50%;background:var(--line);margin:2px auto 0;}
+
+  .legend{display:flex;gap:14px;justify-content:center;font-size:11px;color:var(--steel-dim);margin-top:8px;}
+  .legend span{display:flex;align-items:center;gap:5px;}
+  .legend i{width:7px;height:7px;border-radius:50%;display:inline-block;}
+
+  /* summary */
+  .section-title{
+    font-size:13px;font-weight:700;color:var(--steel);margin:16px 4px 8px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .quota-tag{
+    font-size:11px;color:var(--blue);background:rgba(63,121,216,0.12);
+    border:1px solid var(--blue-dim);padding:3px 9px;border-radius:20px;cursor:pointer;
+  }
+
+  .summary{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:0 2px 10px rgba(30,50,80,0.06);}
+  .prow{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 12px;border-bottom:1px solid var(--line);gap:10px;
+  }
+  .prow:last-child{border-bottom:none;}
+  .prow .pname{font-size:13.5px;display:flex;align-items:center;gap:6px;}
+  .prow .star{color:var(--amber);font-size:12px;}
+  .prow .bar-wrap{flex:1;height:7px;background:var(--line);border-radius:6px;margin:0 10px;overflow:hidden;}
+  .prow .bar{height:100%;border-radius:6px;background:var(--blue);}
+  .prow .bar.full{background:var(--green);}
+  .prow .bar.over{background:var(--amber);}
+  .prow .hrs{font-size:11.5px;color:var(--steel-dim);min-width:44px;text-align:left;white-space:nowrap;}
+
+  .footer-note{font-size:11px;color:var(--steel-dim);text-align:center;margin-top:16px;line-height:1.7;}
+
+  /* modal / sheet */
+  .overlay{
+    position:fixed;inset:0;background:rgba(4,8,13,0.72);
+    display:none;align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .sheet{
+    width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
+    background:var(--panel);border-radius:20px 20px 0 0;border:1px solid var(--line);
+    padding:16px 16px 26px;animation:up .18s ease-out;box-shadow:0 -8px 30px rgba(20,30,50,0.18);
+  }
+  @keyframes up{from{transform:translateY(24px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .sheet-head h2{font-size:16px;margin:0;font-weight:800;}
+  .close-x{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--steel);
+    width:30px;height:30px;border-radius:9px;font-size:14px;cursor:pointer;
+  }
+
+  .task-card{
+    background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+    padding:11px 12px;margin-bottom:10px;
+  }
+  .task-card .t-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .task-card .t-name{font-size:13.5px;font-weight:700;line-height:1.4;}
+  .task-card .t-meta{font-size:11px;color:var(--steel-dim);margin-top:2px;}
+  .task-card .t-tag{
+    font-size:10px;padding:2px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;
+  }
+  .t-tag.quota{background:rgba(63,121,216,.15);color:var(--blue);border:1px solid var(--blue-dim);}
+  .t-tag.extra{background:rgba(217,154,63,.15);color:var(--amber);border:1px solid #ecc887;}
+  .assigned-names{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+  .chip{
+    background:var(--panel);border:1px solid var(--line);color:var(--ink);
+    font-size:12px;padding:4px 10px;border-radius:20px;
+  }
+  .chip.none{color:var(--red);border-color:#f0bcbe;background:#fdf1f1;}
+  .edit-btn{
+    margin-top:9px;width:100%;background:var(--blue);border:1px solid var(--blue);
+    color:#ffffff;padding:8px;border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer;
+  }
+  .edit-btn:active{transform:scale(0.98);}
+
+  .add-flex-btn{
+    width:100%;background:transparent;border:1.5px dashed var(--line);color:var(--steel);
+    padding:10px;border-radius:12px;font-size:13px;cursor:pointer;margin-top:4px;
+  }
+
+  .roster-pick{display:flex;flex-direction:column;gap:6px;margin:10px 0 14px;max-height:44vh;overflow-y:auto;}
+  .rp-item{
+    display:flex;align-items:center;gap:10px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;
+  }
+  .rp-item.on{border-color:var(--blue);background:rgba(63,121,216,.12);}
+  .rp-item .box{
+    width:19px;height:19px;border-radius:6px;border:1.5px solid var(--steel-dim);
+    display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;
+  }
+  .rp-item.on .box{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .rp-item .nm{font-size:13.5px;flex:1;}
+  .rp-item .star{color:var(--amber);font-size:11px;}
+
+  .save-btn{
+    width:100%;background:var(--blue);border:none;color:#fff;font-weight:800;
+    padding:12px;border-radius:11px;font-size:14px;cursor:pointer;margin-top:4px;
+  }
+  .save-btn:active{transform:scale(0.98);}
+
+  .field{margin-bottom:12px;}
+  .field label{font-size:12px;color:var(--steel);display:block;margin-bottom:5px;}
+  .field input[type=text], .field input[type=number], .field select{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    padding:9px 10px;border-radius:9px;font-size:13.5px;font-family:inherit;
+  }
+  .row2{display:flex;gap:10px;}
+  .row2>*{flex:1;}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:9px;padding:9px 11px;margin-bottom:12px;}
+  .toggle-row span{font-size:13px;}
+  .switch{width:42px;height:24px;border-radius:20px;background:var(--line);position:relative;cursor:pointer;flex-shrink:0;}
+  .switch.on{background:var(--blue);}
+  .switch .knob{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s;}
+  .switch.on .knob{transform:translateX(-18px);}
+
+  .lib-item{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:8px;}
+  .lib-item .li-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .lib-item .li-name{font-size:13px;font-weight:700;flex:1;}
+  .lib-item .li-del{background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px 6px;}
+  .lib-item .li-controls{display:flex;gap:8px;margin-top:8px;align-items:center;}
+  .lib-item .li-controls input[type=number]{width:56px;padding:5px 6px;font-size:12px;}
+  .mini-toggle{font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;color:var(--steel-dim);}
+  .mini-toggle.on{background:rgba(63,121,216,.15);color:var(--blue);border-color:var(--blue-dim);}
+
+  .tabbar{display:flex;gap:6px;margin-bottom:14px;}
+  .tab{flex:1;text-align:center;padding:8px;border-radius:9px;background:var(--panel-2);
+    border:1px solid var(--line);font-size:12.5px;cursor:pointer;color:var(--steel);}
+  .tab.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .tabpane{display:none;}
+  .tabpane.on{display:block;}
+
+  .small-note{font-size:11px;color:var(--steel-dim);margin-bottom:10px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+      <img src="data:image/jpeg;base64,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" alt="לוגו כיתת כוננות" style="width:48px;height:48px;border-radius:12px;object-fit:cover;box-shadow:0 2px 8px rgba(30,50,80,0.18);flex-shrink:0;">
+      <div class="title">
+        <span class="unit">כיתת כוננות · קריית מלאכי</span>
+        <h1>שיבוץ חודשי</h1>
+      </div>
+    </div>
+    <button class="iconbtn" id="openSettings" aria-label="ניהול והגדרות">⚙ ניהול</button>
+  </header>
+
+  <div class="monthbar">
+    <button class="navbtn" id="prevMonth">›</button>
+    <div style="text-align:center;">
+      <div class="m-name" id="monthName">–</div>
+      <div class="m-sub" id="monthSub">–</div>
+    </div>
+    <button class="navbtn" id="nextMonth">‹</button>
+  </div>
+
+  <div style="display:flex;gap:6px;margin-bottom:10px;">
+    <button class="tab on" id="viewGridBtn" style="flex:1;">📅 לוח</button>
+    <button class="tab" id="viewListBtn" style="flex:1;">📋 רשימה מורחבת</button>
+  </div>
+
+  <div class="cal" id="gridViewBox">
+    <div class="weekdays">
+      <span>א</span><span>ב</span><span>ג</span><span>ד</span><span>ה</span><span>ו</span><span>ש</span>
+    </div>
+    <div class="days" id="daysGrid"></div>
+    <div class="legend">
+      <span><i style="background:var(--green)"></i> משובץ במלואו</span>
+      <span><i style="background:var(--amber)"></i> חסר שיבוץ</span>
+    </div>
+  </div>
+
+  <div id="listViewBox" style="display:none;margin-bottom:14px;"></div>
+
+  <div class="section-title">
+    <span>שעות מול מכסה חודשית</span>
+    <span class="quota-tag" id="quotaTag">4 ש׳ לחודש</span>
+  </div>
+  <div class="summary" id="summaryList"></div>
+  <div class="summary" id="summaryLocked" style="display:none;">
+    <div style="padding:22px 16px;text-align:center;">
+      <div style="font-size:24px;margin-bottom:6px;">🔒</div>
+      <div style="font-size:12.5px;color:var(--steel-dim);margin-bottom:12px;">מוצג רק למפקדים</div>
+      <button class="edit-btn" id="unlockSummaryBtn" style="width:auto;padding:8px 20px;">הצגת שעות</button>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    לחיצה על יום בלוח פותחת את פירוט המשימות לאותו יום ומאפשרת לשבץ אנשים.<br>
+    כל שינוי נשמר ומתעדכן מיידית בלוח.<br>
+    לניהול משימות, מכסת שעות ורשימת אנשים – כפתור <b>⚙ ניהול</b> למעלה.
+  </div>
+  <div style="text-align:center;font-size:10px;color:var(--steel-dim);margin-top:10px;opacity:0.6;">
+    גרסה: BUILD_MARKER_2026_09_03_1140_FIXED_SCHEDULES
+  </div>
+
+</div>
+
+<!-- Day sheet -->
+<div class="overlay" id="dayOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="dayTitle">–</h2>
+      <button class="close-x" id="closeDay">✕</button>
+    </div>
+    <div id="dayTasks"></div>
+    <button class="add-flex-btn" id="addFlexTask">＋ הוספת משימה נוספת ליום זה</button>
+  </div>
+</div>
+
+<!-- Roster pick sheet -->
+<div class="overlay" id="pickOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="pickTitle">שיבוץ אנשים</h2>
+      <button class="close-x" id="closePick">✕</button>
+    </div>
+    <div class="small-note" id="pickMeta"></div>
+    <div class="roster-pick" id="rosterPick"></div>
+    <button class="save-btn" id="savePick">שמירת שיבוץ</button>
+  </div>
+</div>
+
+<!-- Choose flex task sheet -->
+<div class="overlay" id="chooseFlexOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>איזו משימה להוסיף?</h2>
+      <button class="close-x" id="closeChooseFlex">✕</button>
+    </div>
+
+    <div class="field">
+      <label>משימה חדשה וחופשית (ליום זה בלבד)</label>
+      <input type="text" id="quickTaskName" placeholder="לדוגמה: התנדבות בסיור התחנה">
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>שעות</label>
+        <input type="number" id="quickTaskHours" value="2" min="0" step="0.5">
+      </div>
+      <div class="field">
+        <label>נספר במכסה?</label>
+        <select id="quickTaskQuota">
+          <option value="1">כן</option>
+          <option value="0">לא – בחירה נוספת</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>תיאור (רשות)</label>
+      <input type="text" id="quickTaskDesc" placeholder="פרטים נוספים על המשימה">
+    </div>
+    <button class="save-btn" id="quickTaskAdd">הוספת המשימה ליום זה</button>
+
+    <div style="margin:18px 0 12px;border-top:1px solid var(--line);"></div>
+    <div class="small-note">או בחירה ממשימות גמישות קיימות בספרייה:</div>
+    <div id="flexChoices"></div>
+  </div>
+</div>
+
+<!-- PIN sheet -->
+<div class="overlay" id="pinOverlay">
+  <div class="sheet" style="max-width:340px;">
+    <div class="sheet-head">
+      <h2>קוד מפקד</h2>
+      <button class="close-x" id="closePin">✕</button>
+    </div>
+    <div class="small-note">גישה לניהול ולשעות אישיות מוגבלת למפקדים. הזינו את קוד המפקד.</div>
+    <div class="field">
+      <input type="password" inputmode="numeric" id="pinInput" placeholder="קוד" style="text-align:center;font-size:18px;letter-spacing:4px;">
+    </div>
+    <button class="save-btn" id="pinSubmit">כניסה</button>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>הגדרות</h2>
+      <button class="close-x" id="closeSettings">✕</button>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab on" data-tab="quota">מכסת שעות</div>
+      <div class="tab" data-tab="tasks">ניהול משימות</div>
+      <div class="tab" data-tab="roster">כוח אדם</div>
+      <div class="tab" data-tab="security">קוד מפקד</div>
+      <div class="tab" data-tab="backup">גיבוי</div>
+      <div class="tab" data-tab="share">שיתוף בוואטסאפ</div>
+    </div>
+
+    <div class="tabpane on" id="tab-quota">
+      <div class="small-note">מכסת השעות החודשית האישית (משימות "מוצמדות למכסה" בלבד נספרות). בחודש עם אימון כיתתי אפשר להוריד ל-3.</div>
+      <div class="row2">
+        <button class="mini-toggle" id="q3" style="flex:1;padding:10px;font-size:13px;">3 שעות (חודש עם אימון)</button>
+        <button class="mini-toggle" id="q4" style="flex:1;padding:10px;font-size:13px;">4 שעות (רגיל)</button>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>או קביעה ידנית</label>
+        <input type="number" id="quotaCustom" min="0" step="0.5">
+      </div>
+    </div>
+
+    <div class="tabpane" id="tab-tasks">
+      <div class="small-note">כאן אפשר לערוך שעות/האם המשימה נספרת במכסה, למחוק משימה מותאמת אישית, או להוסיף משימה חדשה.</div>
+      <div id="libList"></div>
+      <button class="add-flex-btn" id="openNewTask">＋ הוספת משימה חדשה לספרייה</button>
+    </div>
+
+    <div class="tabpane" id="tab-roster">
+      <div class="small-note">רשימת חברי הכיתה. אפשר להוסיף/להסיר לפי שינויים.</div>
+      <div id="rosterMgmt"></div>
+      <div class="field" style="margin-top:8px;">
+        <label>הוספת חבר כיתה</label>
+        <div class="row2">
+          <input type="text" id="newPersonName" placeholder="שם מלא">
+          <button class="edit-btn" style="flex:0 0 auto;padding:9px 16px;" id="addPerson">הוספה</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabpane" id="tab-security">
+      <div class="small-note">קוד זה נדרש כדי לפתוח את פאנל הניהול ואת לוח השעות של החברים. כל מי שמכיר את הקוד נחשב "מפקד" לצורך העניין – כדאי לשתף אותו רק עם מי שצריך.</div>
+      <div class="field">
+        <label>קוד נוכחי</label>
+        <input type="text" id="pinCurrentShow" readonly style="letter-spacing:3px;">
+      </div>
+      <div class="field">
+        <label>שינוי קוד</label>
+        <div class="row2">
+          <input type="text" id="pinNew" inputmode="numeric" placeholder="קוד חדש">
+          <button class="edit-btn" style="flex:0 0 auto;padding:9px 16px;" id="pinChangeBtn">עדכון</button>
+        </div>
+      </div>
+    <div class="tabpane" id="tab-backup">
+      <div class="small-note">
+        אם השמירה האוטומטית נכשלת (תקלת שרת זמנית), אפשר לגבות את כל הנתונים כטקסט ולשחזר אותם מאוחר יותר – זה לא תלוי בשירות האחסון בכלל.
+      </div>
+      <div class="field">
+        <label>ייצוא – העתיקו את הטקסט הזה ושמרו אותו (למשל בהודעה לעצמכם)</label>
+        <textarea id="backupOut" readonly rows="6" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:11px;font-family:monospace;direction:ltr;text-align:left;"></textarea>
+        <button class="edit-btn" id="backupCopy" style="margin-top:8px;">העתקת הגיבוי</button>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label>שחזור – הדביקו כאן טקסט גיבוי קודם</label>
+        <textarea id="backupIn" rows="5" placeholder="הדביקו כאן..." style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:11px;font-family:monospace;direction:ltr;text-align:left;"></textarea>
+        <button class="edit-btn" id="backupRestore" style="margin-top:8px;">שחזור מהטקסט</button>
+      </div>
+      <div class="field" style="margin-top:20px;border-top:1px solid var(--line);padding-top:14px;">
+        <label style="color:var(--red);">איפוס מלא לברירת המחדל</label>
+        <div class="small-note">מוחק את כל הנתונים השמורים בדפדפן הזה (כולל שיבוצים) וטוען מחדש את הגרסה הכי עדכנית של המשימות והשעות. שימושי אם נראה שהעדכונים לא נקלטים.</div>
+        <button class="edit-btn" id="fullReset" style="background:#fdf1f1;border-color:var(--red);color:var(--red);">🗑 איפוס לברירת המחדל</button>
+      </div>
+    </div>
+
+    <div class="tabpane" id="tab-share">
+      <div class="small-note">
+        יוצר רשימה קריאה של השיבוצים בחודש המוצג, מוכנה להעתקה ושליחה כהודעת טקסט בוואטסאפ – לא תלוי בשום שרת.
+      </div>
+      <button class="edit-btn" id="genShareText" style="margin-bottom:10px;">יצירת טקסט מעודכן</button>
+      <textarea id="shareOut" readonly rows="10" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:12px;font-family:inherit;direction:rtl;"></textarea>
+      <button class="edit-btn" id="shareCopy" style="margin-top:8px;">העתקת הטקסט</button>
+    </div>
+  </div>
+</div>
+
+<!-- New task sheet -->
+<div class="overlay" id="newTaskOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>משימה חדשה</h2>
+      <button class="close-x" id="closeNewTask">✕</button>
+    </div>
+    <div class="field">
+      <label>שם המשימה</label>
+      <input type="text" id="ntName" placeholder="לדוגמה: אבטחת אירוע מיוחד">
+    </div>
+    <div class="field">
+      <label>סוג המשימה</label>
+      <select id="ntType">
+        <option value="flex">גמישה – מוסיפים ידנית לכל יום שרוצים</option>
+        <option value="date">חד-פעמית בתאריך קבוע</option>
+        <option value="recurring">קבועה – חוזרת כל שבוע ביום מסוים</option>
+      </select>
+    </div>
+    <div class="field" id="ntDateField" style="display:none;">
+      <label>תאריך</label>
+      <input type="text" id="ntDate" placeholder="YYYY-MM-DD">
+    </div>
+    <div class="field" id="ntWeekdayField" style="display:none;">
+      <label>יום בשבוע</label>
+      <select id="ntWeekday">
+        <option value="0">ראשון</option><option value="1">שני</option><option value="2">שלישי</option>
+        <option value="3">רביעי</option><option value="4">חמישי</option><option value="5">שישי</option>
+        <option value="6">שבת (מוצ״ש)</option>
+      </select>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>שעות</label>
+        <input type="number" id="ntHours" value="2" min="0" step="0.5">
+      </div>
+      <div class="field">
+        <label>נספרת במכסה האישית?</label>
+        <select id="ntQuota">
+          <option value="1">כן</option>
+          <option value="0">לא – בחירה נוספת</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>תיאור (רשות)</label>
+      <input type="text" id="ntDesc" placeholder="פרטים נוספים על המשימה">
+    </div>
+    <button class="save-btn" id="ntSave">הוספת המשימה</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const HE_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+  const HE_WD = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+
+  const DEFAULT_ROSTER = [
+    {name:"אסף פלג", role:"מפקד"},
+    {name:"אליה ביטון"},
+    {name:"אהרון זאב זנו"},
+    {name:"מושל אייבזוב", role:"סגן"},
+    {name:"יהודה ניומן"},
+    {name:"יוני קרניאל"},
+    {name:"ידידיה סגל"},
+    {name:"יוחאי שטרית"},
+    {name:"מנחם גבאי"},
+    {name:"אהרון זאב ברויאר"},
+    {name:"מני עזריאל"},
+    {name:"ערן קורן"},
+    {name:"יוסי פיטוסי"},
+    {name:"אביחי עובד"},
+    {name:"אלעד כלפון"},
+    {name:"שלמה אדרעי"},
+    {name:"שניאור הסופר"},
+    {name:"יוסף מנחם מנדל שץ"},
+    {name:"יוגב איבגי"},
+    {name:"משה שפרלינג"}
+  ];
+
+  const DEFAULT_LIBRARY = [
+    {id:"rh",   name:"סיור נוכחות – ערב ראש השנה",           hours:3, quota:true,  date:"2026-09-11", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
+    {id:"yk",   name:"סיור נוכחות – ערב יום כיפור",           hours:3, quota:true,  date:"2026-09-20", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
+    {id:"suk",  name:"סיור נוכחות – ערב חג הסוכות",           hours:3, quota:true,  date:"2026-09-25", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
+    {id:"thu",  name:"סיור בט\"ש",         hours:3,   quota:true,  date:null, recurring:4, custom:false, fixed:true, time:"21:00", recurStart:"2026-09-01", recurEnd:"2026-09-30", desc:"21:00-00:00"},
+    {id:"fri",  name:"סיור בט\"ש",         hours:2,   quota:true,  date:null, recurring:5, custom:false, fixed:true, time:"10:00", recurStart:"2026-09-01", recurEnd:"2026-09-30", desc:"10:00-12:00"},
+    {id:"mos",  name:"סיור בט\"ש",         hours:2.5, quota:true,  date:null, recurring:6, custom:false, fixed:true, time:"21:30", recurStart:"2026-09-01", recurEnd:"2026-09-30", desc:"21:30-00:00"},
+    {id:"shul", name:"אבטחת בתי כנסת – חגי תשרי",             hours:2, quota:false, date:null, recurring:null, custom:false, time:"19:00", notActivity:true, desc:"התנדבות בלבד – אינה נחשבת כפעילות או משימה רשמית של הכיתה."},
+    {id:"hosh", name:"אבטחת שמחת בית השואבה – סוכות",         hours:2, quota:false, date:null, recurring:null, custom:false, time:"21:00"},
+    {id:"chm",  name:"סיור במקומות הומי קהל – חוה\"מ סוכות",  hours:2, quota:true,  date:null, recurring:null, custom:false, time:"19:00"}
+  ];
+
+  const today = new Date();
+  let state = {
+    year: today.getFullYear(),
+    month: today.getMonth(), // 0-indexed
+    quota: 4,
+    pin: "1234",
+    roster: DEFAULT_ROSTER,
+    library: DEFAULT_LIBRARY,
+    placements: {},      // dateStr -> [taskId,...]  (manually placed flex tasks)
+    assignments: {},     // "dateStr::taskId" -> [names]
+    hoursOverride: {},   // "dateStr::taskId" -> number (overrides the task's default hours for that one occurrence)
+    timeOverride: {},    // "dateStr::taskId" -> "HH:MM" (overrides the task's default start time for that one occurrence)
+    appliedMigrations: ["sep2026-holiday-hours", "sep2026-weekly-hours", "sep2026-recur-scope", "sep2026-desc-hours", "sep2026-thu-fix", "sep2026-fixed-schedules", "sep2026-holidays-not-fixed", "sep2026-holiday-times-v2"]
+  };
+
+  function effectiveHours(ds, taskId, baseHours){
+    const key = `${ds}::${taskId}`;
+    return (state.hoursOverride[key] !== undefined) ? state.hoursOverride[key] : baseHours;
+  }
+  function effectiveTime(ds, taskId, baseTime){
+    const key = `${ds}::${taskId}`;
+    return (state.timeOverride[key] !== undefined) ? state.timeOverride[key] : (baseTime || "");
+  }
+  function taskTagLabel(t){
+    if(t.notActivity) return "לא נחשבת כפעילות";
+    return t.quota ? "נספר במכסה" : "בחירה נוספת";
+  }
+  function taskTagClass(t){
+    return t.quota ? "quota" : "extra";
+  }
+
+  // Session-only: resets every time the app is opened. Not saved anywhere.
+  let unlocked = false;
+  let pinPendingAction = null; // "settings" | "summary"
+
+  const STORAGE_KEY = "kitat-konenut-schedule-v1";
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const saved = JSON.parse(raw);
+        state = Object.assign({}, state, saved);
+        // bring in any new default tasks added in app updates that the
+        // saved data (from before the update) doesn't have yet
+        DEFAULT_LIBRARY.forEach(def=>{
+          if(!state.library.find(t=>t.id===def.id)){
+            state.library.push(def);
+          }
+        });
+        // keep task names in sync with the latest wording, even for
+        // devices that already had an older save (hours/quota edits kept)
+        state.library.forEach(t=>{
+          if(!t.custom){
+            const def = DEFAULT_LIBRARY.find(d=>d.id===t.id);
+            if(def) t.name = def.name;
+          }
+        });
+        // remove the old built-in "8-hour patrol volunteering" task –
+        // replaced by free-form quick-add tasks per day
+        state.library = state.library.filter(t=>t.id!=="vol8");
+        Object.keys(state.placements).forEach(pds=>{
+          state.placements[pds] = state.placements[pds].filter(id=>id!=="vol8");
+        });
+
+        // one-time migrations: apply corrected default hours/times that
+        // were updated after this device's data was first saved, without
+        // clobbering any manual edits made after this point
+        if(!state.appliedMigrations) state.appliedMigrations = [];
+        if(!state.appliedMigrations.includes("sep2026-holiday-hours")){
+          ["rh","yk","suk"].forEach(id=>{
+            const t = state.library.find(x=>x.id===id);
+            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
+            if(t && def){ t.hours = def.hours; t.time = def.time; }
+          });
+          const shulTask = state.library.find(x=>x.id==="shul");
+          if(shulTask){
+            shulTask.notActivity = true;
+            if(!shulTask.desc){
+              shulTask.desc = "התנדבות בלבד – אינה נחשבת כפעילות או משימה רשמית של הכיתה.";
+            }
+          }
+          state.appliedMigrations.push("sep2026-holiday-hours");
+        }
+        if(!state.appliedMigrations.includes("sep2026-weekly-hours")){
+          ["thu","fri","mos"].forEach(id=>{
+            const t = state.library.find(x=>x.id===id);
+            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
+            if(t && def){ t.hours = def.hours; t.time = def.time; }
+          });
+          state.appliedMigrations.push("sep2026-weekly-hours");
+        }
+        if(!state.appliedMigrations.includes("sep2026-recur-scope")){
+          ["thu","fri","mos"].forEach(id=>{
+            const t = state.library.find(x=>x.id===id);
+            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
+            if(t && def){ t.recurStart = def.recurStart; t.recurEnd = def.recurEnd; }
+          });
+          state.appliedMigrations.push("sep2026-recur-scope");
+        }
+        if(!state.appliedMigrations.includes("sep2026-desc-hours")){
+          ["rh","yk","suk","thu","fri","mos"].forEach(id=>{
+            const t = state.library.find(x=>x.id===id);
+            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
+            if(t && def && !t.desc){ t.desc = def.desc; }
+          });
+          state.appliedMigrations.push("sep2026-desc-hours");
+        }
+        if(!state.appliedMigrations.includes("sep2026-thu-fix")){
+          const t = state.library.find(x=>x.id==="thu");
+          const def = DEFAULT_LIBRARY.find(x=>x.id==="thu");
+          if(t && def){ t.hours = def.hours; t.time = def.time; t.desc = def.desc; }
+          state.appliedMigrations.push("sep2026-thu-fix");
+        }
+        if(!state.appliedMigrations.includes("sep2026-fixed-schedules")){
+          ["thu","fri","mos"].forEach(id=>{
+            const t = state.library.find(x=>x.id===id);
+            const def = DEFAULT_LIBRARY.find(x=>x.id===id);
+            if(t && def){
+              t.fixed = true;
+              t.hours = def.hours;
+              t.time = def.time;
+              t.desc = def.desc;
+            }
+          });
+          state.appliedMigrations.push("sep2026-fixed-schedules");
+        }
+        if(!state.appliedMigrations.includes("sep2026-holidays-not-fixed")){
+          ["rh","yk","suk"].forEach(id=>{
+            const t = state.library.find(x=>x.id===id);
+            if(t) delete t.fixed;
+          });
+          state.appliedMigrations.push("sep2026-holidays-not-fixed");
+        }
+        if(!state.appliedMigrations.includes("sep2026-holiday-times-v2")){
+          const holidayDefaults = {
+            rh:  {date:"2026-09-11", hours:3, time:"10:00", desc:"10:00-13:00"},
+            yk:  {date:"2026-09-20", hours:3, time:"10:00", desc:"10:00-13:00"},
+            suk: {date:"2026-09-25", hours:3, time:"10:00", desc:"10:00-13:00"}
+          };
+          Object.entries(holidayDefaults).forEach(([id, def])=>{
+            const t = state.library.find(x=>x.id===id);
+            if(t){
+              t.date = def.date;
+              t.hours = def.hours;
+              t.time = def.time;
+              t.desc = def.desc;
+              delete t.fixed;
+            }
+          });
+          state.appliedMigrations.push("sep2026-holiday-times-v2");
+        }
+      }
+    }catch(e){
+      console.error("שגיאת טעינה", e);
+    }
+    render();
+  }
+
+  function saveState(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      hideSaveWarning();
+      return true;
+    }catch(e){
+      console.error("שגיאת שמירה", e);
+      showSaveWarning();
+      return false;
+    }
+  }
+
+  function showSaveWarning(){
+    let el = document.getElementById("saveWarning");
+    if(!el){
+      el = document.createElement("div");
+      el.id = "saveWarning";
+      el.style.cssText = "position:fixed;bottom:14px;left:50%;transform:translateX(-50%);"
+        + "background:#fff3e0;border:1px solid #f0c987;color:#8a5a00;"
+        + "padding:9px 16px;border-radius:20px;font-size:12px;z-index:99;"
+        + "box-shadow:0 4px 14px rgba(0,0,0,.4);max-width:90vw;text-align:center;";
+      document.body.appendChild(el);
+    }
+    el.textContent = "⚠ לא ניתן היה לשמור בדפדפן הזה (למשל מצב גלישה פרטית). ייצאו גיבוי כדי לא לאבד נתונים.";
+    el.style.display = "block";
+  }
+  function hideSaveWarning(){
+    const el = document.getElementById("saveWarning");
+    if(el) el.style.display = "none";
+  }
+
+  function pad(n){ return n<10 ? "0"+n : ""+n; }
+  function dateStr(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
+
+  // ---------- calendar (.ics) export for a single assignment ----------
+  function icsDT(ds, timeStr){
+    const [y,mo,d] = ds.split("-");
+    const [hh,mm] = timeStr.split(":");
+    return `${y}${mo}${d}T${pad(parseInt(hh,10))}${pad(parseInt(mm,10))}00`;
+  }
+  function addHoursToTime(timeStr, hours){
+    const [hh,mm] = timeStr.split(":").map(Number);
+    let total = hh*60 + mm + Math.round(hours*60);
+    const daysAdded = Math.floor(total / 1440);
+    total = ((total % 1440) + 1440) % 1440;
+    return { time: `${pad(Math.floor(total/60))}:${pad(total%60)}`, daysAdded };
+  }
+  function shiftDateStr(ds, days){
+    if(!days) return ds;
+    const [y,mo,d] = ds.split("-").map(Number);
+    const dt = new Date(y, mo-1, d);
+    dt.setDate(dt.getDate() + days);
+    return dateStr(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  }
+  function icsEscape(text){
+    return String(text).replace(/[\\;,]/g, m=>"\\"+m).replace(/\n/g, "\\n");
+  }
+  function addTaskToCalendar(task, ds, personName){
+    const currentTime = effectiveTime(ds, task.id, task.time);
+    if(!currentTime){
+      const manual = prompt(`שעת ההתחלה למשימה "${task.name}" עדיין לא נקבעה. אפשר להזין שעה זמנית ליומן (פורמט 24 שעות, למשל 20:00), או לבטל ולעדכן מאוחר יותר בהגדרות:`, "");
+      if(manual === null || !/^\d{1,2}:\d{2}$/.test(manual)) { if(manual !== null) alert("פורמט שעה לא תקין."); return; }
+      buildAndDownloadICS(task, ds, personName, manual);
+      return;
+    }
+    // משימות ברזל מיוצאות מיד עם השעה שהוגדרה מראש. אין יותר שינוי ידני ביצוא.
+    if(task.fixed){
+      buildAndDownloadICS(task, ds, personName, currentTime);
+      return;
+    }
+    const input = prompt(`שעת התחלה למשימה "${task.name}" בתאריך ${ds}? (פורמט 24 שעות, למשל 20:00)`, currentTime);
+    if(input === null) return;
+    const startTime = /^\d{1,2}:\d{2}$/.test(input) ? input : currentTime;
+    buildAndDownloadICS(task, ds, personName, startTime);
+  }
+
+  function buildAndDownloadICS(task, ds, personName, startTime){
+    const hrs = effectiveHours(ds, task.id, task.hours);
+    const endResult = addHoursToTime(startTime, hrs);
+    const endDs = shiftDateStr(ds, endResult.daysAdded);
+    const dtStart = icsDT(ds, startTime);
+    const dtEnd = icsDT(endDs, endResult.time);
+    const now = new Date();
+    const dtStamp = icsDT(dateStr(now.getFullYear(), now.getMonth(), now.getDate()), `${pad(now.getHours())}:${pad(now.getMinutes())}`);
+    const uid = `${ds}-${task.id}-${Date.now()}@kitat-konenut-kiryat-malachi`;
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Kitat Konenut Kiryat Malachi//Schedule//HE",
+      "CALSCALE:GREGORIAN",
+      "X-WR-TIMEZONE:Asia/Jerusalem",
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTAMP:${dtStamp}`,
+      `DTSTART;TZID=Asia/Jerusalem:${dtStart}`,
+      `DTEND;TZID=Asia/Jerusalem:${dtEnd}`,
+      `SUMMARY:${icsEscape(task.name)}`,
+      `DESCRIPTION:${icsEscape("שעות: " + startTime + "-" + endResult.time + "\nמשימה עבור " + personName + " - כיתת כוננות קריית מלאכי")}`,
+      "END:VEVENT",
+      "END:VCALENDAR"
+    ].join("\r\n");
+    const blob = new Blob([ics], {type:"text/calendar;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${personName}-${ds}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function getLib(id){ return state.library.find(t=>t.id===id); }
+
+  function instancesForDate(y,m,d){
+    const ds = dateStr(y,m,d);
+    const wd = new Date(y,m,d).getDay();
+    const out = [];
+    state.library.forEach(t=>{
+      if(t.date === ds){ out.push(t); return; }
+      if(t.recurring !== null && t.recurring === wd){
+        if(t.recurStart && ds < t.recurStart) return;
+        if(t.recurEnd && ds > t.recurEnd) return;
+        out.push(t);
+      }
+    });
+    (state.placements[ds]||[]).forEach(id=>{
+      const t = getLib(id);
+      if(t) out.push(t);
+    });
+    return out;
+  }
+
+  function assignedFor(ds, taskId){
+    return state.assignments[`${ds}::${taskId}`] || [];
+  }
+
+  function monthHoursForPerson(name){
+    let quotaHrs = 0, extraHrs = 0;
+    const y = state.year, m = state.month;
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = dateStr(y,m,d);
+      instancesForDate(y,m,d).forEach(t=>{
+        const names = assignedFor(ds, t.id);
+        if(names.includes(name) && !t.notActivity){
+          const hrs = effectiveHours(ds, t.id, t.hours);
+          if(t.quota) quotaHrs += hrs;
+          else extraHrs += hrs;
+        }
+      });
+    }
+    return {quotaHrs, extraHrs};
+  }
+
+  let viewMode = "grid"; // "grid" | "list"
+
+  function render(){
+    renderMonthBar();
+    renderCalendar();
+    renderAgendaList();
+    renderSummary();
+    document.getElementById("quotaTag").textContent = `${state.quota} ש׳ לחודש`;
+  }
+
+  document.getElementById("viewGridBtn").addEventListener("click", ()=>{
+    viewMode = "grid";
+    document.getElementById("viewGridBtn").classList.add("on");
+    document.getElementById("viewListBtn").classList.remove("on");
+    document.getElementById("gridViewBox").style.display = "block";
+    document.getElementById("listViewBox").style.display = "none";
+  });
+  document.getElementById("viewListBtn").addEventListener("click", ()=>{
+    viewMode = "list";
+    document.getElementById("viewListBtn").classList.add("on");
+    document.getElementById("viewGridBtn").classList.remove("on");
+    document.getElementById("gridViewBox").style.display = "none";
+    document.getElementById("listViewBox").style.display = "block";
+    renderAgendaList();
+  });
+
+  function renderAgendaList(){
+    const box = document.getElementById("listViewBox");
+    if(viewMode !== "list"){ return; }
+    box.innerHTML = "";
+    const y = state.year, m = state.month;
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    let anyDay = false;
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = dateStr(y,m,d);
+      const inst = instancesForDate(y,m,d);
+      if(!inst.length) continue;
+      anyDay = true;
+      const dayBox = document.createElement("div");
+      dayBox.className = "cal";
+      dayBox.style.marginBottom = "10px";
+      dayBox.style.cursor = "pointer";
+      const wd = HE_WD[new Date(y,m,d).getDay()];
+      let tasksHtml = inst.map(t=>{
+        const names = assignedFor(ds, t.id);
+        const hrs = effectiveHours(ds, t.id, t.hours);
+        const tm = effectiveTime(ds, t.id, t.time);
+        const namesTxt = names.length ? names.join("، ") : "⚠ לא משובץ";
+        const dotColor = names.length ? "var(--green)" : "var(--amber)";
+        return `
+          <div style="padding:8px 0;border-top:1px solid var(--line);">
+            <div style="display:flex;align-items:center;gap:7px;">
+              <span style="width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
+              <div style="font-weight:700;font-size:13px;">${t.name}</div>
+            </div>
+            ${t.desc
+              ? `<div class="t-meta" style="color:var(--steel);margin-inline-start:16px;">${t.desc}${t.quota?'':' · '+taskTagLabel(t)}</div>`
+              : `<div class="t-meta" style="margin-inline-start:16px;">${tm? 'מ-'+tm+' · ':'שעה טרם נקבעה · '}${hrs} שעות${t.quota?'':' · '+taskTagLabel(t)}</div>`
+            }
+            <div style="font-size:12.5px;margin-top:4px;margin-inline-start:16px;color:${names.length?'var(--ink)':'var(--red)'};">${namesTxt}</div>
+          </div>
+        `;
+      }).join("");
+      dayBox.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-weight:800;font-size:14px;">${d} ב${HE_MONTHS[m]} · יום ${wd}</div>
+          <span style="font-size:16px;color:var(--steel-dim);">›</span>
+        </div>
+        ${tasksHtml}
+      `;
+      dayBox.addEventListener("click", ()=>openDay(y,m,d));
+      box.appendChild(dayBox);
+    }
+    if(!anyDay){
+      box.innerHTML = '<div class="small-note" style="text-align:center;padding:20px;">אין משימות בחודש זה.</div>';
+    }
+  }
+
+  function renderMonthBar(){
+    document.getElementById("monthName").textContent = `${HE_MONTHS[state.month]} ${state.year}`;
+    const d = new Date();
+    const isCurrent = (d.getFullYear()===state.year && d.getMonth()===state.month);
+    document.getElementById("monthSub").textContent = isCurrent ? "החודש הנוכחי" : "";
+  }
+
+  function renderCalendar(){
+    const grid = document.getElementById("daysGrid");
+    grid.innerHTML = "";
+    const y = state.year, m = state.month;
+    const firstWd = new Date(y,m,1).getDay();
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    const todayDs = dateStr(today.getFullYear(), today.getMonth(), today.getDate());
+
+    for(let i=0;i<firstWd;i++){
+      const blank = document.createElement("div");
+      blank.className = "day blank";
+      grid.appendChild(blank);
+    }
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = dateStr(y,m,d);
+      const cell = document.createElement("div");
+      cell.className = "day" + (ds===todayDs ? " today" : "");
+      const inst = instancesForDate(y,m,d);
+      let bodyHtml = "";
+      if(inst.length){
+        const MAX_SHOWN = 2;
+        const shown = inst.slice(0, MAX_SHOWN).map(t=>{
+          const ok = assignedFor(ds,t.id).length > 0;
+          const label = t.name.replace(/</g,"&lt;");
+          const hoursLabel = (t.desc || (t.time? t.time : '')).replace(/</g,"&lt;");
+          return `<div class="day-task-line"><span class="dot-mini ${ok?'ok':'warn'}"></span><span>${label}</span></div>${hoursLabel? `<div class="day-task-hours">${hoursLabel}</div>` : ''}`;
+        }).join('');
+        const extra = inst.length - MAX_SHOWN;
+        bodyHtml = `<div class="day-tasks">${shown}</div>${extra>0 ? `<div class="day-more">+${extra} נוספות</div>` : ''}`;
+      } else {
+        bodyHtml = '<div class="badge-empty"></div>';
+      }
+      cell.innerHTML = `<span class="num">${d}</span>${bodyHtml}`;
+      cell.addEventListener("click", ()=>openDay(y,m,d));
+      grid.appendChild(cell);
+    }
+  }
+
+  function renderSummary(){
+    const list = document.getElementById("summaryList");
+    const locked = document.getElementById("summaryLocked");
+    if(!unlocked){
+      list.style.display = "none";
+      locked.style.display = "block";
+      return;
+    }
+    list.style.display = "block";
+    locked.style.display = "none";
+    list.innerHTML = "";
+    state.roster.forEach(p=>{
+      const {quotaHrs, extraHrs} = monthHoursForPerson(p.name);
+      const pct = Math.min(100, (quotaHrs / state.quota) * 100 || 0);
+      const barClass = quotaHrs >= state.quota ? (quotaHrs > state.quota ? "over":"full") : "";
+      const row = document.createElement("div");
+      row.className = "prow";
+      row.innerHTML = `
+        <div class="pname">${p.role ? '<span class="star">★</span>' : ''}${p.name}</div>
+        <div class="bar-wrap"><div class="bar ${barClass}" style="width:${pct}%"></div></div>
+        <div class="hrs">${quotaHrs}/${state.quota}ש׳${extraHrs? ' <span style="color:var(--amber)">+'+extraHrs+'</span>':''}</div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  // ---------- Day sheet ----------
+  let currentDay = null; // {y,m,d,ds}
+
+  function openDay(y,m,d){
+    const ds = dateStr(y,m,d);
+    currentDay = {y,m,d,ds};
+    const wd = HE_WD[new Date(y,m,d).getDay()];
+    document.getElementById("dayTitle").textContent = `יום ${wd}, ${d} ב${HE_MONTHS[m]}`;
+    renderDayTasks();
+    document.getElementById("dayOverlay").classList.add("show");
+  }
+
+  function renderDayTasks(){
+    const box = document.getElementById("dayTasks");
+    box.innerHTML = "";
+    const inst = instancesForDate(currentDay.y, currentDay.m, currentDay.d);
+    if(!inst.length){
+      box.innerHTML = '<div class="small-note">אין משימות קבועות ליום זה. אפשר להוסיף משימה למטה.</div>';
+    }
+    inst.forEach(t=>{
+      const names = assignedFor(currentDay.ds, t.id);
+      const isManual = (t.date===null && t.recurring===null); // placed manually on this specific day
+      const hrsNow = effectiveHours(currentDay.ds, t.id, t.hours);
+      const timeNow = effectiveTime(currentDay.ds, t.id, t.time);
+      const card = document.createElement("div");
+      card.className = "task-card";
+      card.innerHTML = `
+        <div class="t-head">
+          <div>
+            <div class="t-name">${t.name}</div>
+            ${t.desc
+              ? `<div class="t-meta" style="margin-top:2px;color:var(--steel);">${t.desc}${t.quota?'':' · '+taskTagLabel(t)}</div>`
+              : `<div class="t-meta">${timeNow? 'מ-'+timeNow+' · ':'שעה טרם נקבעה · '}${hrsNow} שעות</div>`
+            }
+          </div>
+          <span class="t-tag ${taskTagClass(t)}">${taskTagLabel(t)}</span>
+        </div>
+        <div class="assigned-names">
+          ${names.length ? names.map(n=>`
+            <span class="chip">
+              ${n}
+              <button class="cal-btn" data-name="${n}" title="הוספה ליומן" style="border:none;background:none;cursor:pointer;font-size:13px;margin-inline-start:5px;padding:0;vertical-align:middle;">📅</button>
+            </span>
+          `).join('') : '<span class="chip none">לא משובץ</span>'}
+        </div>
+        ${t.fixed ? `
+          <div style="margin-top:9px;padding:8px 10px;border:1px solid var(--blue-dim);background:rgba(63,121,216,.08);border-radius:9px;font-size:11.5px;color:var(--blue);font-weight:700;">
+            🔒 משימה קבועה - ${t.desc || (timeNow ? timeNow + ' · ' + hrsNow + ' שעות' : hrsNow + ' שעות')}
+          </div>
+        ` : `
+          <div class="row2" style="margin-top:9px;align-items:flex-start;">
+            <div style="flex:1;">
+              <label style="font-size:11px;color:var(--steel-dim);display:block;margin-bottom:3px;">שעת התחלה ליום הזה בלבד</label>
+              <input type="text" value="${timeNow}" placeholder="HH:MM" data-role="time-override" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:7px 9px;font-size:13px;">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:11px;color:var(--steel-dim);display:block;margin-bottom:3px;">שעות ליום הזה בלבד</label>
+              <input type="number" min="0" step="0.5" value="${hrsNow}" data-role="hours-override" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:7px 9px;font-size:13px;">
+            </div>
+          </div>
+        `}
+        <button class="edit-btn" data-task="${t.id}" style="margin-top:9px;">${names.length? 'עריכת שיבוץ':'שיבוץ אנשים'}</button>
+        ${isManual ? `<button class="edit-btn" data-role="remove-day" style="background:#fdf1f1;border-color:var(--red);color:var(--red);margin-top:6px;">🗑 הסרת המשימה מהיום הזה</button>` : ''}
+      `;
+      card.querySelector(".edit-btn").addEventListener("click", ()=>openPick(t));
+      card.querySelectorAll(".cal-btn").forEach(btn=>{
+        btn.addEventListener("click", (e)=>{
+          e.stopPropagation();
+          addTaskToCalendar(t, currentDay.ds, btn.dataset.name);
+        });
+      });
+      const hoursOverrideInput = card.querySelector('[data-role="hours-override"]');
+      if(hoursOverrideInput) hoursOverrideInput.addEventListener("change",(e)=>{
+        const v = parseFloat(e.target.value);
+        const key = `${currentDay.ds}::${t.id}`;
+        if(!isNaN(v) && v>=0){
+          if(v === t.hours){ delete state.hoursOverride[key]; }
+          else{ state.hoursOverride[key] = v; }
+          saveState();
+          renderDayTasks();
+          renderSummary();
+        }
+      });
+      const timeOverrideInput = card.querySelector('[data-role="time-override"]');
+      if(timeOverrideInput) timeOverrideInput.addEventListener("change",(e)=>{
+        const v = e.target.value.trim();
+        const key = `${currentDay.ds}::${t.id}`;
+        if(v === "" || /^\d{1,2}:\d{2}$/.test(v)){
+          if(v === (t.time||"")){ delete state.timeOverride[key]; }
+          else{ state.timeOverride[key] = v; }
+          saveState();
+          renderDayTasks();
+        } else {
+          e.target.value = timeNow;
+          alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM");
+        }
+      });
+      const removeBtn = card.querySelector('[data-role="remove-day"]');
+      if(removeBtn){
+        removeBtn.addEventListener("click", ()=>{
+          if(confirm(`להסיר את "${t.name}" מהיום ${currentDay.d}/${pad(currentDay.m+1)}? השיבוץ של אותו יום יימחק. המשימה עצמה תישאר זמינה להוספה בימים אחרים.`)){
+            state.placements[currentDay.ds] = (state.placements[currentDay.ds]||[]).filter(id=>id!==t.id);
+            delete state.assignments[`${currentDay.ds}::${t.id}`];
+            delete state.hoursOverride[`${currentDay.ds}::${t.id}`];
+            delete state.timeOverride[`${currentDay.ds}::${t.id}`];
+            saveState();
+            renderDayTasks();
+            renderCalendar();
+            renderSummary();
+          }
+        });
+      }
+      box.appendChild(card);
+    });
+  }
+
+  document.getElementById("closeDay").addEventListener("click", ()=>{
+    document.getElementById("dayOverlay").classList.remove("show");
+  });
+
+  // ---------- add flex task to day ----------
+  document.getElementById("addFlexTask").addEventListener("click", ()=>{
+    document.getElementById("quickTaskName").value = "";
+    document.getElementById("quickTaskHours").value = 2;
+    document.getElementById("quickTaskQuota").value = "1";
+    document.getElementById("quickTaskDesc").value = "";
+    renderFlexChoices();
+    document.getElementById("chooseFlexOverlay").classList.add("show");
+  });
+
+  function renderFlexChoices(){
+    const box = document.getElementById("flexChoices");
+    box.innerHTML = "";
+    const already = new Set(instancesForDate(currentDay.y,currentDay.m,currentDay.d).map(t=>t.id));
+    const options = state.library.filter(t=> t.date===null && t.recurring===null && !already.has(t.id));
+    if(!options.length){
+      box.innerHTML = '<div class="small-note">אין משימות גמישות נוספות בספרייה שאינן כבר ביום זה.</div>';
+    }
+    options.forEach(t=>{
+      const btn = document.createElement("div");
+      btn.className = "task-card";
+      btn.style.cursor = "pointer";
+      btn.innerHTML = `<div class="t-name">${t.name}</div><div class="t-meta">${t.hours} שעות · ${taskTagLabel(t)}</div>`;
+      btn.addEventListener("click", ()=>{
+        if(!state.placements[currentDay.ds]) state.placements[currentDay.ds] = [];
+        state.placements[currentDay.ds].push(t.id);
+        saveState();
+        document.getElementById("chooseFlexOverlay").classList.remove("show");
+        renderDayTasks();
+        renderCalendar();
+      });
+      box.appendChild(btn);
+    });
+  }
+
+  document.getElementById("quickTaskAdd").addEventListener("click", ()=>{
+    const name = document.getElementById("quickTaskName").value.trim();
+    if(!name){ alert("יש להזין שם למשימה"); return; }
+    const hours = parseFloat(document.getElementById("quickTaskHours").value) || 0;
+    const quota = document.getElementById("quickTaskQuota").value === "1";
+    const desc = document.getElementById("quickTaskDesc").value.trim();
+    const id = "c_" + Date.now();
+    const newTask = {id, name, hours, quota, date:null, recurring:null, custom:true, time:"20:00", desc};
+    state.library.push(newTask);
+    if(!state.placements[currentDay.ds]) state.placements[currentDay.ds] = [];
+    state.placements[currentDay.ds].push(id);
+    saveState();
+    document.getElementById("chooseFlexOverlay").classList.remove("show");
+    renderDayTasks();
+    renderCalendar();
+  });
+
+  document.getElementById("closeChooseFlex").addEventListener("click", ()=>{
+    document.getElementById("chooseFlexOverlay").classList.remove("show");
+  });
+
+  // ---------- roster pick sheet ----------
+  let pickTask = null;
+  let pickSelected = new Set();
+
+  function openPick(task){
+    pickTask = task;
+    pickSelected = new Set(assignedFor(currentDay.ds, task.id));
+    document.getElementById("pickTitle").textContent = task.name;
+    document.getElementById("pickMeta").textContent = `${currentDay.d} ב${HE_MONTHS[currentDay.m]} · ${effectiveHours(currentDay.ds, task.id, task.hours)} שעות${task.time ? ' · ' + effectiveTime(currentDay.ds, task.id, task.time) : ''} · ${task.notActivity ? 'לא נחשבת כפעילות, לא נספרת במכסה' : (task.quota?'נספר במכסה החודשית':'בחירה נוספת, לא נספר במכסה')}`;
+    renderRosterPick();
+    document.getElementById("pickOverlay").classList.add("show");
+  }
+
+  function renderRosterPick(){
+    const box = document.getElementById("rosterPick");
+    box.innerHTML = "";
+    state.roster.forEach(p=>{
+      const on = pickSelected.has(p.name);
+      const item = document.createElement("div");
+      item.className = "rp-item" + (on?" on":"");
+      item.innerHTML = `<div class="box">${on?'✓':''}</div><div class="nm">${p.name}</div>${p.role?'<span class="star">★</span>':''}`;
+      item.addEventListener("click", ()=>{
+        if(pickSelected.has(p.name)) pickSelected.delete(p.name);
+        else pickSelected.add(p.name);
+        renderRosterPick();
+      });
+      box.appendChild(item);
+    });
+  }
+
+  document.getElementById("closePick").addEventListener("click", ()=>{
+    document.getElementById("pickOverlay").classList.remove("show");
+  });
+
+  document.getElementById("savePick").addEventListener("click", ()=>{
+    const key = `${currentDay.ds}::${pickTask.id}`;
+    if(pickSelected.size){
+      state.assignments[key] = Array.from(pickSelected);
+    } else {
+      delete state.assignments[key];
+    }
+    saveState();
+    document.getElementById("pickOverlay").classList.remove("show");
+    renderDayTasks();
+    renderCalendar();
+    renderSummary();
+  });
+
+  // ---------- month nav ----------
+  document.getElementById("prevMonth").addEventListener("click", ()=>{
+    state.month--;
+    if(state.month<0){state.month=11; state.year--;}
+    render();
+  });
+  document.getElementById("nextMonth").addEventListener("click", ()=>{
+    state.month++;
+    if(state.month>11){state.month=0; state.year++;}
+    render();
+  });
+
+  // ---------- PIN / unlock ----------
+  function requestUnlock(action){
+    if(unlocked){
+      afterUnlock(action);
+      return;
+    }
+    pinPendingAction = action;
+    document.getElementById("pinInput").value = "";
+    document.getElementById("pinOverlay").classList.add("show");
+  }
+  function afterUnlock(action){
+    if(action === "settings"){
+      renderQuotaTab();
+      renderLibList();
+      renderRosterMgmt();
+      document.getElementById("pinCurrentShow").value = state.pin;
+      document.getElementById("backupOut").value = JSON.stringify(state);
+      document.getElementById("settingsOverlay").classList.add("show");
+    } else if(action === "summary"){
+      renderSummary();
+    }
+  }
+  document.getElementById("pinSubmit").addEventListener("click", ()=>{
+    const val = document.getElementById("pinInput").value.trim();
+    if(val === String(state.pin)){
+      unlocked = true;
+      document.getElementById("pinOverlay").classList.remove("show");
+      afterUnlock(pinPendingAction);
+    } else {
+      alert("קוד שגוי");
+    }
+  });
+  document.getElementById("closePin").addEventListener("click", ()=>{
+    document.getElementById("pinOverlay").classList.remove("show");
+  });
+  document.getElementById("unlockSummaryBtn").addEventListener("click", ()=>{
+    requestUnlock("summary");
+  });
+
+  // ---------- settings ----------
+  document.getElementById("openSettings").addEventListener("click", ()=>{
+    requestUnlock("settings");
+  });
+  document.getElementById("closeSettings").addEventListener("click", ()=>{
+    document.getElementById("settingsOverlay").classList.remove("show");
+  });
+
+  document.querySelectorAll("#settingsOverlay .tab").forEach(tab=>{
+    tab.addEventListener("click", ()=>{
+      document.querySelectorAll("#settingsOverlay .tab").forEach(t=>t.classList.remove("on"));
+      document.querySelectorAll("#settingsOverlay .tabpane").forEach(p=>p.classList.remove("on"));
+      tab.classList.add("on");
+      document.getElementById("tab-"+tab.dataset.tab).classList.add("on");
+    });
+  });
+
+  function renderQuotaTab(){
+    document.getElementById("quotaCustom").value = state.quota;
+    document.getElementById("q3").classList.toggle("on", state.quota===3);
+    document.getElementById("q4").classList.toggle("on", state.quota===4);
+  }
+  document.getElementById("q3").addEventListener("click", ()=>{ state.quota=3; saveState(); render(); renderQuotaTab(); });
+  document.getElementById("q4").addEventListener("click", ()=>{ state.quota=4; saveState(); render(); renderQuotaTab(); });
+  document.getElementById("quotaCustom").addEventListener("change", (e)=>{
+    const v = parseFloat(e.target.value);
+    if(!isNaN(v) && v>=0){ state.quota=v; saveState(); render(); renderQuotaTab(); }
+  });
+
+  function renderLibList(){
+    const box = document.getElementById("libList");
+    box.innerHTML = "";
+    state.library.forEach(t=>{
+      const item = document.createElement("div");
+      item.className = "lib-item";
+      let typeLabel = t.date ? `תאריך קבוע: ${t.date}` : (t.recurring!==null ? `חוזרת כל ${HE_WD[t.recurring]}${(t.recurStart||t.recurEnd) ? ` (${t.recurStart||'ללא התחלה'} עד ${t.recurEnd||'ללא סוף'})` : ' (ללא הגבלת חודשים)'}` : "משימה גמישה");
+      item.innerHTML = `
+        <div class="li-top">
+          <div class="li-name">${t.name}</div>
+          ${t.custom ? '<button class="li-del">✕</button>' : ''}
+        </div>
+        <div class="t-meta">${typeLabel}</div>
+        <div class="li-controls">
+          <input type="number" min="0" step="0.5" value="${t.hours}" data-role="hours" ${t.fixed?'disabled':''}>
+          <span class="t-meta">שעות</span>
+          <input type="text" value="${t.time||''}" data-role="time" style="width:64px;padding:5px 6px;font-size:12px;" placeholder="טרם נקבע" ${t.fixed?'disabled':''}>
+          <span class="t-meta">שעת התחלה</span>
+          <button class="mini-toggle ${t.quota?'on':''}" data-role="quota">${t.quota?'נספר במכסה':'בחירה נוספת'}</button>
+        </div>
+        <div class="small-note" style="margin-top:4px;">${t.fixed ? '🔒 משימה קבועה - השעות מוגדרות מראש ואינן ניתנות לשינוי.' : 'אפשר להשאיר את שעת ההתחלה ריקה אם היא עוד לא ידועה, ולעדכן בהמשך.'}</div>
+        ${t.recurring!==null ? `
+        <div class="field" style="margin-top:8px;margin-bottom:0;">
+          <label style="font-size:11px;">בתוקף רק בין התאריכים (ריק = ללא הגבלה, ירוץ גם בחודשים הבאים)</label>
+          <div class="row2">
+            <input type="text" value="${t.recurStart||''}" data-role="recur-start" placeholder="מתאריך YYYY-MM-DD">
+            <input type="text" value="${t.recurEnd||''}" data-role="recur-end" placeholder="עד תאריך YYYY-MM-DD">
+          </div>
+        </div>
+        ` : ''}
+        <div class="field" style="margin-top:8px;margin-bottom:0;">
+          <label style="font-size:11px;">תיאור (רשות – יוצג בפירוט היום)</label>
+          <input type="text" value="${t.desc||''}" data-role="desc" placeholder="לדוגמה: מפגש בכניסה הראשית">
+        </div>
+      `;
+      item.querySelector('[data-role="hours"]').addEventListener("change",(e)=>{
+        const v = parseFloat(e.target.value);
+        if(!isNaN(v) && v>=0){ t.hours=v; saveState(); render(); }
+      });
+      item.querySelector('[data-role="time"]').addEventListener("change",(e)=>{
+        const v = e.target.value.trim();
+        if(v === "" || /^\d{1,2}:\d{2}$/.test(v)){ t.time=v; saveState(); render(); }
+        else{ e.target.value = t.time||''; }
+      });
+      const recurStartInput = item.querySelector('[data-role="recur-start"]');
+      if(recurStartInput){
+        recurStartInput.addEventListener("change",(e)=>{
+          const v = e.target.value.trim();
+          if(v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v)){ t.recurStart = v || null; saveState(); render(); }
+          else{ e.target.value = t.recurStart||''; alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); }
+        });
+      }
+      const recurEndInput = item.querySelector('[data-role="recur-end"]');
+      if(recurEndInput){
+        recurEndInput.addEventListener("change",(e)=>{
+          const v = e.target.value.trim();
+          if(v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v)){ t.recurEnd = v || null; saveState(); render(); }
+          else{ e.target.value = t.recurEnd||''; alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); }
+        });
+      }
+      item.querySelector('[data-role="desc"]').addEventListener("change",(e)=>{
+        t.desc = e.target.value.trim();
+        saveState(); render();
+      });
+      item.querySelector('[data-role="quota"]').addEventListener("click",(e)=>{
+        t.quota = !t.quota;
+        e.target.classList.toggle("on", t.quota);
+        e.target.textContent = t.quota?'נספר במכסה':'בחירה נוספת';
+        saveState(); render();
+      });
+      const delBtn = item.querySelector(".li-del");
+      if(delBtn){
+        delBtn.addEventListener("click", ()=>{
+          if(confirm("למחוק את המשימה מהספרייה?")){
+            state.library = state.library.filter(x=>x.id!==t.id);
+            // clean up placements referencing it
+            Object.keys(state.placements).forEach(ds=>{
+              state.placements[ds] = state.placements[ds].filter(id=>id!==t.id);
+            });
+            saveState(); render(); renderLibList();
+          }
+        });
+      }
+      box.appendChild(item);
+    });
+  }
+
+  function renderRosterMgmt(){
+    const box = document.getElementById("rosterMgmt");
+    box.innerHTML = "";
+    state.roster.forEach((p,idx)=>{
+      const row = document.createElement("div");
+      row.className = "lib-item";
+      row.innerHTML = `
+        <div class="li-top">
+          <div class="li-name">${p.role?'★ ':''}${p.name}</div>
+          <button class="li-del">✕</button>
+        </div>
+      `;
+      row.querySelector(".li-del").addEventListener("click", ()=>{
+        if(confirm(`להסיר את ${p.name} מהכיתה?`)){
+          state.roster.splice(idx,1);
+          saveState(); render(); renderRosterMgmt();
+        }
+      });
+      box.appendChild(row);
+    });
+  }
+
+  document.getElementById("pinChangeBtn").addEventListener("click", ()=>{
+    const val = document.getElementById("pinNew").value.trim();
+    if(val.length < 3){ alert("יש לבחור קוד באורך 3 תווים לפחות"); return; }
+    state.pin = val;
+    document.getElementById("pinNew").value = "";
+    document.getElementById("pinCurrentShow").value = state.pin;
+    saveState();
+    alert("הקוד עודכן");
+  });
+
+  document.getElementById("addPerson").addEventListener("click", ()=>{
+    const inp = document.getElementById("newPersonName");
+    const name = inp.value.trim();
+    if(name){
+      state.roster.push({name});
+      inp.value = "";
+      saveState(); render(); renderRosterMgmt();
+    }
+  });
+
+  // ---------- backup / restore (works even if storage service is down) ----------
+  document.getElementById("backupCopy").addEventListener("click", ()=>{
+    const ta = document.getElementById("backupOut");
+    ta.value = JSON.stringify(state);
+    ta.select();
+    ta.setSelectionRange(0, 999999);
+    try{
+      document.execCommand("copy");
+      alert("הגיבוי הועתק. אפשר להדביק אותו בהודעה לעצמכם.");
+    }catch(e){
+      alert("סמנו את הטקסט בתיבה למעלה והעתיקו ידנית (Ctrl+C).");
+    }
+  });
+
+  document.getElementById("backupRestore").addEventListener("click", ()=>{
+    const raw = document.getElementById("backupIn").value.trim();
+    if(!raw){ alert("הדביקו קודם טקסט גיבוי בתיבה"); return; }
+    let parsed;
+    try{
+      parsed = JSON.parse(raw);
+    }catch(e){
+      alert("הטקסט שהודבק אינו גיבוי תקין");
+      return;
+    }
+    if(!confirm("לשחזר את הנתונים מהגיבוי? זה יחליף את המצב הנוכחי במסך (השמירה בשרת תתבצע כרגיל כשהשירות יחזור לפעול).")){
+      return;
+    }
+    state = Object.assign({}, state, parsed);
+    document.getElementById("backupIn").value = "";
+    saveState();
+    render();
+    document.getElementById("pinCurrentShow").value = state.pin;
+    document.getElementById("backupOut").value = JSON.stringify(state);
+    alert("שוחזר בהצלחה");
+  });
+
+  document.getElementById("fullReset").addEventListener("click", ()=>{
+    if(!confirm("לאפס לגמרי? כל השיבוצים, המשימות המותאמות אישית, וכוח האדם שהוספת יימחקו מהמכשיר הזה, וייטענו ברירות המחדל העדכניות ביותר. פעולה זו לא הפיכה (אלא אם יש לכם גיבוי).")){
+      return;
+    }
+    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+    location.reload();
+  });
+
+  // ---------- new task ----------
+  document.getElementById("openNewTask").addEventListener("click", ()=>{
+    document.getElementById("ntName").value = "";
+    document.getElementById("ntHours").value = 2;
+    document.getElementById("ntType").value = "flex";
+    document.getElementById("ntDate").value = "";
+    document.getElementById("ntQuota").value = "1";
+    document.getElementById("ntDesc").value = "";
+    document.getElementById("ntDateField").style.display = "none";
+    document.getElementById("ntWeekdayField").style.display = "none";
+    document.getElementById("newTaskOverlay").classList.add("show");
+  });
+  document.getElementById("closeNewTask").addEventListener("click", ()=>{
+    document.getElementById("newTaskOverlay").classList.remove("show");
+  });
+  document.getElementById("ntType").addEventListener("change", (e)=>{
+    document.getElementById("ntDateField").style.display = e.target.value==="date" ? "block":"none";
+    document.getElementById("ntWeekdayField").style.display = e.target.value==="recurring" ? "block":"none";
+  });
+  document.getElementById("ntSave").addEventListener("click", ()=>{
+    const name = document.getElementById("ntName").value.trim();
+    if(!name){ alert("יש להזין שם משימה"); return; }
+    const type = document.getElementById("ntType").value;
+    const hours = parseFloat(document.getElementById("ntHours").value) || 0;
+    const quota = document.getElementById("ntQuota").value === "1";
+    const id = "c_" + Date.now();
+    let date = null, recurring = null;
+    if(type==="date"){
+      date = document.getElementById("ntDate").value.trim();
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); return; }
+    }
+    if(type==="recurring"){
+      recurring = parseInt(document.getElementById("ntWeekday").value, 10);
+    }
+    const desc = document.getElementById("ntDesc").value.trim();
+    state.library.push({id, name, hours, quota, date, recurring, custom:true, time:"20:00", desc});
+    saveState();
+    document.getElementById("newTaskOverlay").classList.remove("show");
+    render();
+    renderLibList();
+  });
+
+  // ---------- WhatsApp-friendly share text ----------
+  function buildShareText(){
+    const y = state.year, m = state.month;
+    const daysInMonth = new Date(y, m+1, 0).getDate();
+    let lines = [];
+    lines.push(`📋 שיבוץ ${HE_MONTHS[m]} ${y} – כיתת כוננות קריית מלאכי`);
+    lines.push("");
+    for(let d=1; d<=daysInMonth; d++){
+      const ds = dateStr(y,m,d);
+      const wd = HE_WD[new Date(y,m,d).getDay()];
+      const inst = instancesForDate(y,m,d);
+      if(!inst.length) continue;
+      lines.push(`${d}/${pad(m+1)} יום ${wd}:`);
+      inst.forEach(t=>{
+        const names = assignedFor(ds, t.id);
+        const namesTxt = names.length ? names.join(", ") : "⚠ לא משובץ";
+        lines.push(`  • ${t.name} — ${namesTxt}`);
+      });
+      lines.push("");
+    }
+    lines.push("עדכון אחרון: " + new Date().toLocaleDateString("he-IL"));
+    return lines.join("\n");
+  }
+
+  document.getElementById("genShareText").addEventListener("click", ()=>{
+    document.getElementById("shareOut").value = buildShareText();
+  });
+  document.getElementById("shareCopy").addEventListener("click", ()=>{
+    const ta = document.getElementById("shareOut");
+    if(!ta.value){ ta.value = buildShareText(); }
+    ta.select();
+    ta.setSelectionRange(0, 999999);
+    try{
+      document.execCommand("copy");
+      alert("הטקסט הועתק — עכשיו אפשר להדביק אותו בוואטסאפ.");
+    }catch(e){
+      alert("סמנו את הטקסט בתיבה למעלה והעתיקו ידנית (Ctrl+C).");
+    }
+  });
+
+  loadState();
+})();
+</script>
+</body>
+</html>
