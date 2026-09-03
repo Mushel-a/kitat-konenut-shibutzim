@@ -1,4 +1,4 @@
-
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -460,7 +460,7 @@
         יוצר רשימה קריאה של השיבוצים בחודש המוצג, מוכנה להעתקה ושליחה כהודעת טקסט בוואטסאפ – לא תלוי בשום שרת.
       </div>
       <button class="edit-btn" id="genShareText" style="margin-bottom:10px;">📋 יצירת הודעה מעודכנת</button>
-      <button class="edit-btn" id="shareWhatsApp" style="margin-bottom:10px;background:#eaf8ee;border-color:#25d366;color:#128c3a;">🟢 פתיחה ושליחה בוואטסאפ</button>
+      <button type="button" class="edit-btn" id="shareWhatsApp" onclick="if(window.openWhatsAppShare){window.openWhatsAppShare();}" style="margin-bottom:10px;background:#eaf8ee;border-color:#25d366;color:#128c3a;">🟢 יצירת הודעה ופתיחה בוואטסאפ</button>
       <textarea id="shareOut" readonly rows="10" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:12px;font-family:inherit;direction:rtl;"></textarea>
       <button class="edit-btn" id="shareCopy" style="margin-top:8px;">העתקת הטקסט</button>
     </div>
@@ -1638,11 +1638,22 @@
   }
 
   function openWhatsAppShare(){
-    const text = buildShareText();
-    document.getElementById("shareOut").value = text;
-    const url = "https://wa.me/?text=" + encodeURIComponent(text);
-    window.open(url, "_blank");
+    try{
+      const text = buildShareText();
+      const out = document.getElementById("shareOut");
+      if(out) out.value = text;
+      const url = "https://wa.me/?text=" + encodeURIComponent(text);
+      const win = window.open(url, "_blank", "noopener,noreferrer");
+      if(!win){
+        // אם הדפדפן חסם חלון חדש, פותחים באותו חלון כדי שהכפתור תמיד יעבוד
+        window.location.href = url;
+      }
+    }catch(e){
+      console.error("שגיאה בשיתוף בוואטסאפ", e);
+      alert("לא ניתן ליצור את הודעת השיתוף. נסה לרענן את הדף ולנסות שוב.");
+    }
   }
+  window.openWhatsAppShare = openWhatsAppShare;
 
   document.getElementById("genShareText").addEventListener("click", ()=>{
     document.getElementById("shareOut").value = buildShareText();
