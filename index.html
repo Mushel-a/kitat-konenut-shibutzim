@@ -630,6 +630,22 @@
   let firebaseUnsubscribe = null;
   let remoteApplying = false;
   let firebaseReadyOnce = false;
+  let firebaseSyncStatus = "מתחבר לענן...";
+
+  function setFirebaseStatus(text, ok=false, error=false){
+    firebaseSyncStatus = text;
+    let el = document.getElementById("firebaseStatus");
+    if(!el){
+      el = document.createElement("div");
+      el.id = "firebaseStatus";
+      el.style.cssText = "position:fixed;top:10px;left:10px;z-index:120;padding:6px 10px;border-radius:16px;font-size:11px;font-weight:700;background:#eef3f7;color:#526575;border:1px solid #ccd7df;box-shadow:0 2px 8px rgba(0,0,0,.12);direction:rtl;";
+      document.body.appendChild(el);
+    }
+    el.textContent = (ok ? "☁️ " : error ? "⚠️ " : "⏳ ") + text;
+    el.style.background = ok ? "#eaf8ee" : error ? "#fff3e0" : "#eef3f7";
+    el.style.color = ok ? "#128c3a" : error ? "#8a5a00" : "#526575";
+    el.style.borderColor = ok ? "#b8e5c7" : error ? "#f0c987" : "#ccd7df";
+  }
 
   function applyLocalMigrations(){
     if(!Array.isArray(state.deletedTaskIds)) state.deletedTaskIds = [];
@@ -664,14 +680,17 @@
   }
 
   async function loadState(){
+    // local data is only a fallback/cache; Firestore is the shared source of truth.
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       if(raw){ try{ state = Object.assign({}, state, JSON.parse(raw)); }catch(e){ console.warn("שמירת דפדפן פגומה",e); } }
       applyLocalMigrations();
-    }catch(e){ console.error("שגיאת טעינה מקומית",e); }
+    }catch(e){ console.warn("שגיאת טעינה מקומית",e); }
     render();
+    setFirebaseStatus("מתחבר לענן...");
 
     try{
+      if(!window.firebaseReady) throw new Error("Firebase לא אותחל");
       const db = await window.firebaseReady;
       const ref = doc(db, "schedules", "main");
       const snap = await getDoc(ref);
@@ -680,12 +699,13 @@
         state = Object.assign({}, state, snap.data().state);
         applyLocalMigrations();
         remoteApplying = false;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
         render();
       }else{
         await setDoc(ref, {state: JSON.parse(JSON.stringify(state)), updatedAt: serverTimestamp()});
       }
       firebaseReadyOnce = true;
+      setFirebaseStatus("מסונכרן", true, false);
       if(firebaseUnsubscribe) firebaseUnsubscribe();
       firebaseUnsubscribe = onSnapshot(ref, snap2=>{
         if(!snap2.exists() || !snap2.data().state || remoteApplying) return;
@@ -695,26 +715,40 @@
         try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
         render();
         remoteApplying = false;
-      }, err=>{ console.error("שגיאת סנכרון Firebase",err); showSaveWarning(); });
+        setFirebaseStatus("מסונכרן", true, false);
+      }, err=>{
+        console.error("שגיאת סנכרון Firebase",err);
+        setFirebaseStatus("שגיאה בסנכרון הענן", false, true);
+        showSaveWarning("⚠️ אין גישה לענן כרגע. השינויים נשמרים מקומית בלבד.");
+      });
     }catch(e){
       console.error("Firebase sync unavailable",e);
-      showSaveWarning();
+      setFirebaseStatus("שגיאה בסנכרון הענן", false, true);
+      showSaveWarning("⚠️ אין גישה לענן כרגע. השינויים נשמרים מקומית בלבד.");
     }
   }
 
   function saveState(){
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      hideSaveWarning();
-    }catch(e){ console.error("שגיאת שמירה",e); showSaveWarning(); }
-    if(firebaseReadyOnce && !remoteApplying){
+    }catch(e){
+      // localStorage is only a cache; do not show the old misleading warning.
+      console.warn("לא ניתן לשמור מטמון מקומי", e);
+    }
+    if(!remoteApplying && window.firebaseReady){
+      setFirebaseStatus("שומר בענן...");
       window.firebaseReady.then(db=>setDoc(doc(db,"schedules","main"), {state: JSON.parse(JSON.stringify(state)), updatedAt: serverTimestamp()}))
-        .catch(e=>{ console.error("שגיאת שמירה ל-Firestore",e); showSaveWarning(); });
+        .then(()=>setFirebaseStatus("מסונכרן", true, false))
+        .catch(e=>{
+          console.error("שגיאת שמירה ל-Firestore",e);
+          setFirebaseStatus("שגיאה בשמירה לענן", false, true);
+          showSaveWarning("⚠️ השינוי לא נשמר בענן. בדוק את חיבור Firebase והרשאות Firestore.");
+        });
     }
     return true;
   }
 
-  function showSaveWarning(){
+  function showSaveWarning(message){
     let el = document.getElementById("saveWarning");
     if(!el){
       el = document.createElement("div");
@@ -725,7 +759,7 @@
         + "box-shadow:0 4px 14px rgba(0,0,0,.4);max-width:90vw;text-align:center;";
       document.body.appendChild(el);
     }
-    el.textContent = "⚠ לא ניתן היה לשמור בדפדפן הזה (למשל מצב גלישה פרטית). ייצאו גיבוי כדי לא לאבד נתונים.";
+    el.textContent = message || "⚠️ אין גישה לענן כרגע. השינויים נשמרים מקומית בלבד.";
     el.style.display = "block";
   }
   function hideSaveWarning(){
@@ -1322,10 +1356,10 @@
 
   function renderQuotaTab(){
     document.getElementById("quotaCustom").value = state.quota;
-    document.getElementById("q3").classList.toggle("on", state.quota===3);
+    document.getElementById("q3").classList.toggle("on", state.quota===2);
     document.getElementById("q4").classList.toggle("on", state.quota===4);
   }
-  document.getElementById("q3").addEventListener("click", ()=>{ state.quota=3; saveState(); render(); renderQuotaTab(); });
+  document.getElementById("q3").addEventListener("click", ()=>{ state.quota=2; saveState(); render(); renderQuotaTab(); });
   document.getElementById("q4").addEventListener("click", ()=>{ state.quota=4; saveState(); render(); renderQuotaTab(); });
   document.getElementById("quotaCustom").addEventListener("change", (e)=>{
     const v = parseFloat(e.target.value);
