@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -459,7 +459,8 @@
       <div class="small-note">
         יוצר רשימה קריאה של השיבוצים בחודש המוצג, מוכנה להעתקה ושליחה כהודעת טקסט בוואטסאפ – לא תלוי בשום שרת.
       </div>
-      <button class="edit-btn" id="genShareText" style="margin-bottom:10px;">יצירת טקסט מעודכן</button>
+      <button class="edit-btn" id="genShareText" style="margin-bottom:10px;">📋 יצירת הודעה מעודכנת</button>
+      <button class="edit-btn" id="shareWhatsApp" style="margin-bottom:10px;background:#eaf8ee;border-color:#25d366;color:#128c3a;">🟢 פתיחה ושליחה בוואטסאפ</button>
       <textarea id="shareOut" readonly rows="10" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:12px;font-family:inherit;direction:rtl;"></textarea>
       <button class="edit-btn" id="shareCopy" style="margin-top:8px;">העתקת הטקסט</button>
     </div>
@@ -1351,6 +1352,9 @@
       document.querySelectorAll("#settingsOverlay .tabpane").forEach(p=>p.classList.remove("on"));
       tab.classList.add("on");
       document.getElementById("tab-"+tab.dataset.tab).classList.add("on");
+      if(tab.dataset.tab === "share"){
+        document.getElementById("shareOut").value = buildShareText();
+      }
     });
   });
 
@@ -1597,28 +1601,54 @@
     const y = state.year, m = state.month;
     const daysInMonth = new Date(y, m+1, 0).getDate();
     let lines = [];
-    lines.push(`📋 שיבוץ ${HE_MONTHS[m]} ${y} – כיתת כוננות קריית מלאכי`);
+    let missing = 0;
+    let assigned = 0;
+    let total = 0;
+
+    lines.push(`📋 שיבוץ ${HE_MONTHS[m]} ${y} - כיתת כוננות`);
     lines.push("");
+
     for(let d=1; d<=daysInMonth; d++){
       const ds = dateStr(y,m,d);
       const wd = HE_WD[new Date(y,m,d).getDay()];
       const inst = instancesForDate(y,m,d);
       if(!inst.length) continue;
-      lines.push(`${d}/${pad(m+1)} יום ${wd}:`);
+
+      lines.push(`📅 ${d}/${pad(m+1)} יום ${wd}`);
       inst.forEach(t=>{
         const names = assignedFor(ds, t.id);
-        const namesTxt = names.length ? names.join(", ") : "⚠ לא משובץ";
-        lines.push(`  • ${t.name} — ${namesTxt}`);
+        total += 1;
+        if(names.length){
+          assigned += names.length;
+          lines.push(`• ${t.name}: ${names.join(", ")}`);
+        }else{
+          missing += 1;
+          lines.push(`• ${t.name}: ⚠ חוסר שיבוץ`);
+        }
       });
       lines.push("");
     }
-    lines.push("עדכון אחרון: " + new Date().toLocaleDateString("he-IL"));
+
+    lines.push("━━━━━━━━━━━━━━");
+    lines.push(`📊 סיכום: ${assigned} שיבוצים | ${missing} חוסרים | ${total} משימות`);
+    if(missing === 0) lines.push("✅ אין חוסרים בשיבוץ");
+    lines.push("");
+    lines.push("הודעה נוצרה מתוך מערכת השיבוצים");
     return lines.join("\n");
+  }
+
+  function openWhatsAppShare(){
+    const text = buildShareText();
+    document.getElementById("shareOut").value = text;
+    const url = "https://wa.me/?text=" + encodeURIComponent(text);
+    window.open(url, "_blank");
   }
 
   document.getElementById("genShareText").addEventListener("click", ()=>{
     document.getElementById("shareOut").value = buildShareText();
   });
+
+  document.getElementById("shareWhatsApp").addEventListener("click", openWhatsAppShare);
   document.getElementById("shareCopy").addEventListener("click", ()=>{
     const ta = document.getElementById("shareOut");
     if(!ta.value){ ta.value = buildShareText(); }
