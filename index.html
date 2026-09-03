@@ -573,9 +573,9 @@
     {id:"rh",   name:"סיור נוכחות – ערב ראש השנה",           hours:3, quota:true,  date:"2026-09-11", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
     {id:"yk",   name:"סיור נוכחות – ערב יום כיפור",           hours:3, quota:true,  date:"2026-09-20", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
     {id:"suk",  name:"סיור נוכחות – ערב חג הסוכות",           hours:3, quota:true,  date:"2026-09-25", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
-    {id:"thu",  name:"סיור בט\"ש",         hours:3,   quota:true,  date:null, recurring:4, custom:false, fixed:true, time:"21:00", recurStart:"2026-09-01", recurEnd:"2026-09-30", desc:"21:00-00:00"},
-    {id:"fri",  name:"סיור בט\"ש",         hours:2,   quota:true,  date:null, recurring:5, custom:false, fixed:true, time:"10:00", recurStart:"2026-09-01", recurEnd:"2026-09-30", desc:"10:00-12:00"},
-    {id:"mos",  name:"סיור בט\"ש",         hours:2.5, quota:true,  date:null, recurring:6, custom:false, fixed:true, time:"21:30", recurStart:"2026-09-01", recurEnd:"2026-09-30", desc:"21:30-00:00"},
+    {id:"thu",  name:"סיור בט\"ש",         hours:3,   quota:true,  date:null, recurring:4, custom:false, fixed:true, time:"21:00", recurStart:null, recurEnd:null, desc:"21:00-00:00"},
+    {id:"fri",  name:"סיור בט\"ש",         hours:2,   quota:true,  date:null, recurring:5, custom:false, fixed:true, time:"10:00", recurStart:null, recurEnd:null, desc:"10:00-12:00"},
+    {id:"mos",  name:"סיור בט\"ש",         hours:2.5, quota:true,  date:null, recurring:6, custom:false, fixed:true, time:"21:30", recurStart:null, recurEnd:null, desc:"21:30-00:00"},
     {id:"shul", name:"אבטחת בתי כנסת – חגי תשרי",             hours:2, quota:false, date:null, recurring:null, custom:false, time:"19:00", notActivity:true, desc:"התנדבות בלבד – אינה נחשבת כפעילות או משימה רשמית של הכיתה."},
     {id:"hosh", name:"אבטחת שמחת בית השואבה – סוכות",         hours:2, quota:false, date:null, recurring:null, custom:false, time:"21:00"},
     {id:"chm",  name:"סיור במקומות הומי קהל – חוה\"מ סוכות",  hours:2, quota:true,  date:null, recurring:null, custom:false, time:"19:00"}
@@ -593,6 +593,7 @@
     assignments: {},     // "dateStr::taskId" -> [names]
     hoursOverride: {},   // "dateStr::taskId" -> number (overrides the task's default hours for that one occurrence)
     timeOverride: {},    // "dateStr::taskId" -> "HH:MM" (overrides the task's default start time for that one occurrence)
+    deletedTaskIds: [],    // built-in/custom task ids explicitly deleted by the user
     appliedMigrations: ["sep2026-holiday-hours", "sep2026-weekly-hours", "sep2026-recur-scope", "sep2026-desc-hours", "sep2026-thu-fix", "sep2026-fixed-schedules", "sep2026-holidays-not-fixed", "sep2026-holiday-times-v2"]
   };
 
@@ -615,6 +616,7 @@
   // Session-only: resets every time the app is opened. Not saved anywhere.
   let unlocked = false;
   let pinPendingAction = null; // "settings" | "summary"
+  let pendingDeleteAction = null;
 
   const STORAGE_KEY = "kitat-konenut-schedule-v1";
 
@@ -626,19 +628,14 @@
         state = Object.assign({}, state, saved);
         // bring in any new default tasks added in app updates that the
         // saved data (from before the update) doesn't have yet
+        if(!Array.isArray(state.deletedTaskIds)) state.deletedTaskIds = [];
         DEFAULT_LIBRARY.forEach(def=>{
+          if(state.deletedTaskIds.includes(def.id)) return;
           if(!state.library.find(t=>t.id===def.id)){
-            state.library.push(def);
+            state.library.push({...def});
           }
         });
-        // keep task names in sync with the latest wording, even for
-        // devices that already had an older save (hours/quota edits kept)
-        state.library.forEach(t=>{
-          if(!t.custom){
-            const def = DEFAULT_LIBRARY.find(d=>d.id===t.id);
-            if(def) t.name = def.name;
-          }
-        });
+
         // remove the old built-in "8-hour patrol volunteering" task –
         // replaced by free-form quick-add tasks per day
         state.library = state.library.filter(t=>t.id!=="vol8");
@@ -732,6 +729,13 @@
             }
           });
           state.appliedMigrations.push("sep2026-holiday-times-v2");
+        }
+        if(!state.appliedMigrations.includes("iron-schedules-unlimited")){
+          ["thu","fri","mos"].forEach(id=>{
+            const t = state.library.find(x=>x.id===id);
+            if(t){ t.recurStart = null; t.recurEnd = null; t.fixed = true; }
+          });
+          state.appliedMigrations.push("iron-schedules-unlimited");
         }
       }
     }catch(e){
@@ -1145,14 +1149,16 @@
       if(removeBtn){
         removeBtn.addEventListener("click", ()=>{
           if(confirm(`להסיר את "${t.name}" מהיום ${currentDay.d}/${pad(currentDay.m+1)}? השיבוץ של אותו יום יימחק. המשימה עצמה תישאר זמינה להוספה בימים אחרים.`)){
-            state.placements[currentDay.ds] = (state.placements[currentDay.ds]||[]).filter(id=>id!==t.id);
-            delete state.assignments[`${currentDay.ds}::${t.id}`];
-            delete state.hoursOverride[`${currentDay.ds}::${t.id}`];
-            delete state.timeOverride[`${currentDay.ds}::${t.id}`];
-            saveState();
-            renderDayTasks();
-            renderCalendar();
-            renderSummary();
+            requestDeleteUnlock(()=>{
+              state.placements[currentDay.ds] = (state.placements[currentDay.ds]||[]).filter(id=>id!==t.id);
+              delete state.assignments[`${currentDay.ds}::${t.id}`];
+              delete state.hoursOverride[`${currentDay.ds}::${t.id}`];
+              delete state.timeOverride[`${currentDay.ds}::${t.id}`];
+              saveState();
+              renderDayTasks();
+              renderCalendar();
+              renderSummary();
+            });
           }
         });
       }
@@ -1302,12 +1308,24 @@
       renderSummary();
     }
   }
+  function requestDeleteUnlock(action){
+    pendingDeleteAction = action;
+    document.getElementById("pinInput").value = "";
+    document.getElementById("pinOverlay").classList.add("show");
+  }
+
   document.getElementById("pinSubmit").addEventListener("click", ()=>{
     const val = document.getElementById("pinInput").value.trim();
     if(val === String(state.pin)){
       unlocked = true;
       document.getElementById("pinOverlay").classList.remove("show");
-      afterUnlock(pinPendingAction);
+      if(pendingDeleteAction){
+        const actionToRun = pendingDeleteAction;
+        pendingDeleteAction = null;
+        actionToRun();
+      } else {
+        afterUnlock(pinPendingAction);
+      }
     } else {
       alert("קוד שגוי");
     }
@@ -1357,8 +1375,8 @@
       let typeLabel = t.date ? `תאריך קבוע: ${t.date}` : (t.recurring!==null ? `חוזרת כל ${HE_WD[t.recurring]}${(t.recurStart||t.recurEnd) ? ` (${t.recurStart||'ללא התחלה'} עד ${t.recurEnd||'ללא סוף'})` : ' (ללא הגבלת חודשים)'}` : "משימה גמישה");
       item.innerHTML = `
         <div class="li-top">
-          <div class="li-name">${t.name}</div>
-          ${t.custom ? '<button class="li-del">✕</button>' : ''}
+          <input type="text" value="${t.name.replace(/"/g,'&quot;')}" data-role="name" class="li-name-input">
+          <button class="li-del" title="מחק משימה">✕</button>
         </div>
         <div class="t-meta">${typeLabel}</div>
         <div class="li-controls">
@@ -1383,6 +1401,11 @@
           <input type="text" value="${t.desc||''}" data-role="desc" placeholder="לדוגמה: מפגש בכניסה הראשית">
         </div>
       `;
+      item.querySelector('[data-role="name"]').addEventListener("change",(e)=>{
+        const v = e.target.value.trim();
+        if(v){ t.name=v; saveState(); render(); renderLibList(); }
+        else e.target.value=t.name;
+      });
       item.querySelector('[data-role="hours"]').addEventListener("change",(e)=>{
         const v = parseFloat(e.target.value);
         if(!isNaN(v) && v>=0){ t.hours=v; saveState(); render(); }
@@ -1422,12 +1445,14 @@
       if(delBtn){
         delBtn.addEventListener("click", ()=>{
           if(confirm("למחוק את המשימה מהספרייה?")){
-            state.library = state.library.filter(x=>x.id!==t.id);
-            // clean up placements referencing it
-            Object.keys(state.placements).forEach(ds=>{
-              state.placements[ds] = state.placements[ds].filter(id=>id!==t.id);
+            requestDeleteUnlock(()=>{
+              state.library = state.library.filter(x=>x.id!==t.id);
+              if(!state.deletedTaskIds.includes(t.id)) state.deletedTaskIds.push(t.id);
+              Object.keys(state.placements).forEach(ds=>{
+                state.placements[ds] = state.placements[ds].filter(id=>id!==t.id);
+              });
+              saveState(); render(); renderLibList();
             });
-            saveState(); render(); renderLibList();
           }
         });
       }
@@ -1449,8 +1474,10 @@
       `;
       row.querySelector(".li-del").addEventListener("click", ()=>{
         if(confirm(`להסיר את ${p.name} מהכיתה?`)){
-          state.roster.splice(idx,1);
-          saveState(); render(); renderRosterMgmt();
+          requestDeleteUnlock(()=>{
+            state.roster.splice(idx,1);
+            saveState(); render(); renderRosterMgmt();
+          });
         }
       });
       box.appendChild(row);
@@ -1517,8 +1544,10 @@
     if(!confirm("לאפס לגמרי? כל השיבוצים, המשימות המותאמות אישית, וכוח האדם שהוספת יימחקו מהמכשיר הזה, וייטענו ברירות המחדל העדכניות ביותר. פעולה זו לא הפיכה (אלא אם יש לכם גיבוי).")){
       return;
     }
-    try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
-    location.reload();
+    requestDeleteUnlock(()=>{
+      try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+      location.reload();
+    });
   });
 
   // ---------- new task ----------
