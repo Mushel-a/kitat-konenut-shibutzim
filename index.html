@@ -529,7 +529,6 @@
   window.firebaseReady = (async () => {
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js");
     const firestore = await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js");
-    const analytics = await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js");
 
     const firebaseConfig = {
       apiKey: "AIzaSyBq5IOpJhlw01qWGCLG2DbCfo5n0EsMB_M",
@@ -546,7 +545,6 @@
     window.firebaseApp = app;
     window.firebaseDB = db;
     window.firebaseFirestore = firestore;
-    try { window.firebaseAnalytics = analytics.getAnalytics(app); } catch(e) { console.warn("Firebase Analytics unavailable", e); }
     return db;
   })().catch(err => {
     console.error("Firebase initialization failed", err);
@@ -879,10 +877,11 @@
     return state.assignments[`${ds}::${taskId}`] || [];
   }
 
-  // כל המשימות נספרות במכסה, למעט אבטחת בתי כנסת – חגי תשרי.
-  // שלושת סיורי הבט"ש הקבועים כן נספרים במכסה.
+  // ההגדרה במשימה קובעת אם היא נספרת במכסה.
+  // אין החרגות אוטומטיות: אם מסומן "נספר במכסה" - השעות נספרות,
+  // ואם מסומן "בחירה נוספת" - השעות נחשבות מעבר למכסה.
   function countsTowardQuota(t){
-    return t.id !== "shul" && !t.notActivity;
+    return !!t.quota && !t.notActivity;
   }
 
   function monthHoursForPerson(name){
@@ -1488,21 +1487,29 @@
       `;
       row.querySelector(".li-del").addEventListener("click", ()=>{
         const personName = p.name;
-        if(confirm(`להסיר את ${personName} מהכיתה?`)){
-          requestDeleteUnlock(()=>{
-            const removeIndex = state.roster.findIndex(person => person.name === personName);
-            if(removeIndex === -1){
-              alert("החבר כבר לא נמצא ברשימת כוח האדם.");
-              renderRosterMgmt();
-              return;
-            }
-            state.roster.splice(removeIndex,1);
-            saveState();
-            render();
-            renderRosterMgmt();
-            alert(`${personName} הוסר מרשימת כוח האדם.`);
-          });
+        if(!confirm(`להסיר את ${personName} מהכיתה?`)) return;
+
+        // הסרת חבר משתמשת באימות PIN ישיר כדי למנוע תלות ב-pendingDeleteAction
+        // ובאירועי הממשק של חלון ה-PIN.
+        const enteredPin = prompt("הזן את קוד המפקד כדי להסיר את החבר:");
+        if(enteredPin === null) return;
+        if(enteredPin.trim() !== String(state.pin)){
+          alert("קוד שגוי");
+          return;
         }
+
+        const removeIndex = state.roster.findIndex(person => person.name === personName);
+        if(removeIndex === -1){
+          alert("החבר כבר לא נמצא ברשימת כוח האדם.");
+          renderRosterMgmt();
+          return;
+        }
+
+        state.roster.splice(removeIndex,1);
+        saveState();
+        render();
+        renderRosterMgmt();
+        alert(`${personName} הוסר מרשימת כוח האדם.`);
       });
       box.appendChild(row);
     });
