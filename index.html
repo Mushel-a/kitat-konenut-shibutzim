@@ -395,7 +395,7 @@
     </div>
 
     <div class="tabpane on" id="tab-quota">
-      <div class="small-note">מכסת השעות החודשית האישית. כל המשימות נספרות במכסה, למעט שלוש משימות הבט"ש הקבועות ואבטחת בתי כנסת – חגי תשרי. בחודש עם אימון כיתתי אפשר להוריד ל-2.</div>
+      <div class="small-note">מכסת השעות החודשית האישית. כל המשימות נספרות במכסה, כולל שלושת סיורי הבט"ש הקבועים. אבטחת בתי כנסת – חגי תשרי אינה נספרת במכסה. בחודש עם אימון כיתתי אפשר להוריד ל-2.</div>
       <div class="row2">
         <button class="mini-toggle" id="q3" style="flex:1;padding:10px;font-size:13px;">2 שעות (חודש עם אימון)</button>
         <button class="mini-toggle" id="q4" style="flex:1;padding:10px;font-size:13px;">4 שעות (רגיל)</button>
@@ -586,9 +586,9 @@
     {id:"rh",   name:"סיור נוכחות – ערב ראש השנה",           hours:3, quota:true,  date:"2026-09-11", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
     {id:"yk",   name:"סיור נוכחות – ערב יום כיפור",           hours:3, quota:true,  date:"2026-09-20", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
     {id:"suk",  name:"סיור נוכחות – ערב חג הסוכות",           hours:3, quota:true,  date:"2026-09-25", recurring:null, custom:false, time:"10:00", desc:"10:00-13:00"},
-    {id:"thu",  name:"סיור בט\"ש",         hours:3,   quota:false,  date:null, recurring:4, custom:false, fixed:true, time:"21:00", recurStart:null, recurEnd:null, desc:"21:00-00:00"},
-    {id:"fri",  name:"סיור בט\"ש",         hours:2,   quota:false,  date:null, recurring:5, custom:false, fixed:true, time:"10:00", recurStart:null, recurEnd:null, desc:"10:00-12:00"},
-    {id:"mos",  name:"סיור בט\"ש",         hours:2.5, quota:false,  date:null, recurring:6, custom:false, fixed:true, time:"21:30", recurStart:null, recurEnd:null, desc:"21:30-00:00"},
+    {id:"thu",  name:"סיור בט\"ש",         hours:3,   quota:true,   date:null, recurring:4, custom:false, fixed:true, time:"21:00", recurStart:null, recurEnd:null, desc:"21:00-00:00"},
+    {id:"fri",  name:"סיור בט\"ש",         hours:2,   quota:true,   date:null, recurring:5, custom:false, fixed:true, time:"10:00", recurStart:null, recurEnd:null, desc:"10:00-12:00"},
+    {id:"mos",  name:"סיור בט\"ש",         hours:2.5, quota:true,  date:null, recurring:6, custom:false, fixed:true, time:"21:30", recurStart:null, recurEnd:null, desc:"21:30-00:00"},
     {id:"shul", name:"אבטחת בתי כנסת – חגי תשרי",             hours:2, quota:false, date:null, recurring:null, custom:false, time:"19:00", notActivity:true, desc:"התנדבות בלבד – אינה נחשבת כפעילות או משימה רשמית של הכיתה."},
     {id:"hosh", name:"אבטחת שמחת בית השואבה – סוכות",         hours:2, quota:true, date:null, recurring:null, custom:false, time:"21:00"},
     {id:"chm",  name:"סיור במקומות הומי קהל – חוה\"מ סוכות",  hours:2, quota:true,  date:null, recurring:null, custom:false, time:"19:00"}
@@ -879,9 +879,10 @@
     return state.assignments[`${ds}::${taskId}`] || [];
   }
 
-  // כל המשימות נספרות במכסה, למעט שלוש משימות בט"ש קבועות ואבטחת בתי כנסת – חגי תשרי.
+  // כל המשימות נספרות במכסה, למעט אבטחת בתי כנסת – חגי תשרי.
+  // שלושת סיורי הבט"ש הקבועים כן נספרים במכסה.
   function countsTowardQuota(t){
-    return !["thu", "fri", "mos", "shul"].includes(t.id);
+    return t.id !== "shul" && !t.notActivity;
   }
 
   function monthHoursForPerson(name){
@@ -1312,9 +1313,11 @@
     }
   }
   function requestDeleteUnlock(action){
-    pendingDeleteAction = action;
+    pendingDeleteAction = (typeof action === "function") ? action : null;
+    if(!pendingDeleteAction) return;
     document.getElementById("pinInput").value = "";
     document.getElementById("pinOverlay").classList.add("show");
+    setTimeout(()=>document.getElementById("pinInput").focus(), 50);
   }
 
   document.getElementById("pinSubmit").addEventListener("click", ()=>{
@@ -1325,7 +1328,12 @@
       if(pendingDeleteAction){
         const actionToRun = pendingDeleteAction;
         pendingDeleteAction = null;
-        actionToRun();
+        try{
+          actionToRun();
+        }catch(err){
+          console.error("Delete action failed", err);
+          alert("הפעולה לא הושלמה. נסה שוב.");
+        }
       } else {
         afterUnlock(pinPendingAction);
       }
@@ -1479,10 +1487,20 @@
         </div>
       `;
       row.querySelector(".li-del").addEventListener("click", ()=>{
-        if(confirm(`להסיר את ${p.name} מהכיתה?`)){
+        const personName = p.name;
+        if(confirm(`להסיר את ${personName} מהכיתה?`)){
           requestDeleteUnlock(()=>{
-            state.roster.splice(idx,1);
-            saveState(); render(); renderRosterMgmt();
+            const removeIndex = state.roster.findIndex(person => person.name === personName);
+            if(removeIndex === -1){
+              alert("החבר כבר לא נמצא ברשימת כוח האדם.");
+              renderRosterMgmt();
+              return;
+            }
+            state.roster.splice(removeIndex,1);
+            saveState();
+            render();
+            renderRosterMgmt();
+            alert(`${personName} הוסר מרשימת כוח האדם.`);
           });
         }
       });
