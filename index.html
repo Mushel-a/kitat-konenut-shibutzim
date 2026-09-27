@@ -298,7 +298,7 @@
     לניהול משימות, מכסת שעות ורשימת אנשים – כפתור <b>⚙ ניהול</b> למעלה.
   </div>
   <div style="text-align:center;font-size:10px;color:var(--steel-dim);margin-top:10px;opacity:0.6;">
-    גרסה: BUILD_MARKER_2026_09_03_1140_FIXED_SCHEDULES
+    גרסה: BUILD_MARKER_2026_09_27_MONTHLY_QUOTA_ANNUAL_REPORT_DELETE_FIX
   </div>
 
 </div>
@@ -396,13 +396,23 @@
       <div class="tab" data-tab="security">קוד מפקד</div>
       <div class="tab" data-tab="backup">גיבוי</div>
       <div class="tab" data-tab="share">שיתוף בוואטסאפ</div>
+      <div class="tab" data-tab="annual">דוח שנתי</div>
     </div>
 
     <div class="tabpane on" id="tab-quota">
-      <div class="small-note">מכסת השעות החודשית האישית. כל המשימות נספרות במכסה, כולל שלושת סיורי הבט"ש הקבועים. אבטחת בתי כנסת – חגי תשרי אינה נספרת במכסה. בחודש עם אימון כיתתי אפשר להוריד ל-2.</div>
+      <div class="small-note">מכסת השעות נשמרת בנפרד לכל חודש. ניתן לבחור כל חודש ושנה, כולל חודשים קודמים, ולתקן את המכסה רטרואקטיבית. כל המשימות נספרות לפי ההגדרה שלהן. אבטחת בתי כנסת – חגי תשרי אינה נספרת במכסה.</div>
       <div class="row2">
         <button class="mini-toggle" id="q3" style="flex:1;padding:10px;font-size:13px;">2 שעות (חודש עם אימון)</button>
         <button class="mini-toggle" id="q4" style="flex:1;padding:10px;font-size:13px;">4 שעות (רגיל)</button>
+      </div>
+      <div class="small-note" style="margin-top:10px;">החודש המוגדר כרגע: <b id="quotaMonthLabel">–</b></div>
+      <div class="field" style="margin-top:10px;">
+        <label>בחר חודש ושנה להגדרת המכסה</label>
+        <div class="row2">
+          <select id="quotaYearSelect"></select>
+          <select id="quotaMonthSelect"></select>
+        </div>
+        <div class="small-note" style="margin-top:5px;">ניתן לשנות גם חודשים קודמים ורטרואקטיבית, עד 2030.</div>
       </div>
       <div class="field" style="margin-top:12px;">
         <label>או קביעה ידנית</label>
@@ -492,6 +502,24 @@
       <button type="button" class="edit-btn" id="shareWhatsApp" style="margin-bottom:10px;background:#eaf8ee;border-color:#25d366;color:#128c3a;">🟢 יצירת הודעה ופתיחה בוואטסאפ</button>
       <textarea id="shareOut" readonly rows="10" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:12px;font-family:inherit;direction:rtl;"></textarea>
       <button class="edit-btn" id="shareCopy" style="margin-top:8px;">העתקת הטקסט</button>
+    </div>
+
+    <div class="tabpane" id="tab-annual">
+      <div class="small-note">דוח שנתי מרכז את הפעילות מתחילת התקופה שתבחר ועד דצמבר. כל חודש מחושב לפי המכסה שהוגדרה לאותו חודש. לוחם שלא זמין באותו חודש אינו מסומן כחסר.</div>
+      <div class="row2" style="margin-top:10px;">
+        <div class="field" style="flex:1;">
+          <label>שנה</label>
+          <select id="annualYear"></select>
+        </div>
+        <div class="field" style="flex:1;">
+          <label>התחלה</label>
+          <select id="annualStartMonth"></select>
+        </div>
+      </div>
+      <button class="edit-btn" id="generateAnnualReport">📊 הפקת דוח שנתי</button>
+      <textarea id="annualReportOut" readonly rows="16" style="width:100%;margin-top:10px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font-size:12px;font-family:inherit;direction:rtl;"></textarea>
+      <button class="edit-btn" id="copyAnnualReport" style="margin-top:8px;">העתקת הדוח</button>
+    </div>
     </div>
   </div>
 </div>
@@ -621,6 +649,7 @@
     year: today.getFullYear(),
     month: today.getMonth(), // 0-indexed
     quota: 4,
+    quotaByMonth: {}, // "YYYY-M" -> monthly quota
     pin: "1234",
     roster: DEFAULT_ROSTER,
     library: DEFAULT_LIBRARY,
@@ -630,6 +659,7 @@
     timeOverride: {},    // "dateStr::taskId" -> "HH:MM" (overrides the task's default start time for that one occurrence)
     deletedTaskIds: [],    // built-in/custom task ids explicitly deleted by the user
     cancelledTaskDates: {}, // "date::taskId" -> true, for one-day cancellations including fixed tasks
+    deletedTaskDates: {},   // "date::taskId" -> true, for explicit deletion of a task occurrence
     manualHours: [],        // {id, name, hours, reason, year, month}
     availability: {},       // "year-month::name" -> {status, reason}
     appliedMigrations: ["sep2026-holiday-hours", "sep2026-weekly-hours", "sep2026-recur-scope", "sep2026-desc-hours", "sep2026-thu-fix", "sep2026-fixed-schedules", "sep2026-holidays-not-fixed", "sep2026-holiday-times-v2"]
@@ -660,6 +690,7 @@
 
   let firebaseUnsubscribe = null;
   let remoteApplying = false;
+  let firebaseSaveChain = Promise.resolve();
   let firebaseReadyOnce = false;
   let firebaseSyncStatus = "מתחבר לענן...";
 
@@ -686,8 +717,15 @@
     if(!state.hoursOverride) state.hoursOverride = {};
     if(!state.timeOverride) state.timeOverride = {};
     if(!state.cancelledTaskDates) state.cancelledTaskDates = {};
+    if(!state.deletedTaskDates) state.deletedTaskDates = {};
     if(!Array.isArray(state.manualHours)) state.manualHours = [];
     if(!state.availability) state.availability = {};
+    if(!state.quotaByMonth || typeof state.quotaByMonth !== "object") state.quotaByMonth = {};
+    const currentQuotaKey = `${state.year}-${state.month}`;
+    if(state.quotaByMonth[currentQuotaKey] === undefined) state.quotaByMonth[currentQuotaKey] = Number(state.quota) || 4;
+    // Ensure future/unconfigured months have the normal default without changing configured months.
+    for(let mi=0; mi<12; mi++){ const k=`${state.year}-${mi}`; if(state.quotaByMonth[k]===undefined) state.quotaByMonth[k]=4; }
+    state.deletedTaskIds = [...new Set(state.deletedTaskIds || [])];
     DEFAULT_LIBRARY.forEach(def=>{
       if(state.deletedTaskIds.includes(def.id)) return;
       if(!state.library.find(t=>t.id===def.id)) state.library.push({...def});
@@ -711,6 +749,15 @@
     if(!state.appliedMigrations.includes("sep2026-holidays-not-fixed")){["rh","yk","suk"].forEach(id=>{const t=state.library.find(x=>x.id===id);if(t)delete t.fixed;});pushOnce("sep2026-holidays-not-fixed");}
     if(!state.appliedMigrations.includes("sep2026-holiday-times-v2")){const hd={rh:{date:"2026-09-11",hours:3,time:"10:00",desc:"10:00-13:00"},yk:{date:"2026-09-20",hours:3,time:"10:00",desc:"10:00-13:00"},suk:{date:"2026-09-25",hours:3,time:"10:00",desc:"10:00-13:00"}};Object.entries(hd).forEach(([id,d])=>{const t=state.library.find(x=>x.id===id);if(t){Object.assign(t,d);delete t.fixed;}});pushOnce("sep2026-holiday-times-v2");}
     if(!state.appliedMigrations.includes("iron-schedules-unlimited")){["thu","fri","mos"].forEach(id=>{const t=state.library.find(x=>x.id===id);if(t){t.recurStart=null;t.recurEnd=null;t.fixed=true;}});pushOnce("iron-schedules-unlimited");}
+    if(!state.appliedMigrations.includes("nonfixed-no-cross-month")){
+      state.library.forEach(t=>{
+        if(t.custom && !t.fixed && t.recurring !== null && !t.date){
+          // Keep the task available in the library, but do not let it repeat automatically.
+          t.recurring = null;
+        }
+      });
+      pushOnce("nonfixed-no-cross-month");
+    }
   }
 
   async function loadState(){
@@ -766,20 +813,28 @@
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }catch(e){
-      // localStorage is only a cache; do not show the old misleading warning.
       console.warn("לא ניתן לשמור מטמון מקומי", e);
     }
+
     if(!remoteApplying && window.firebaseReady){
+      const snapshotState = JSON.parse(JSON.stringify(state));
       setFirebaseStatus("שומר בענן...");
-      window.firebaseReady.then(db=>window.firebaseFirestore.setDoc(window.firebaseFirestore.doc(db,"schedules","main"), {state: JSON.parse(JSON.stringify(state)), updatedAt: window.firebaseFirestore.serverTimestamp()}))
-        .then(()=>setFirebaseStatus("מסונכרן", true, false))
+      firebaseSaveChain = firebaseSaveChain
+        .catch(()=>{})
+        .then(()=>window.firebaseReady)
+        .then(db=>window.firebaseFirestore.setDoc(
+          window.firebaseFirestore.doc(db,"schedules","main"),
+          {state:snapshotState, updatedAt:window.firebaseFirestore.serverTimestamp()}
+        ))
+        .then(()=>{
+          setFirebaseStatus("מסונכרן", true, false);
+        })
         .catch(e=>{
           console.error("שגיאת שמירה ל-Firestore",e);
           setFirebaseStatus("שגיאה בשמירה לענן", false, true);
-          showSaveWarning("⚠️ השינוי לא נשמר בענן. בדוק את חיבור Firebase והרשאות Firestore.");
+          showSaveWarning("⚠️ אין גישה לענן כרגע. השינויים נשמרים מקומית בלבד.");
         });
     }
-    return true;
   }
 
   function showSaveWarning(message){
@@ -882,24 +937,34 @@
     URL.revokeObjectURL(url);
   }
 
-  function getLib(id){ return state.library.find(t=>t.id===id); }
+  function getLib(id){ return state.library.find(t=>t.id===id && !state.deletedTaskIds.includes(t.id)); }
 
   function instancesForDate(y,m,d){
     const ds = dateStr(y,m,d);
     const wd = new Date(y,m,d).getDay();
     const out = [];
     state.library.forEach(t=>{
+      if(state.deletedTaskIds.includes(t.id)) return;
+      if(state.deletedTaskDates[`${ds}::${t.id}`]) return;
       if(state.cancelledTaskDates[`${ds}::${t.id}`]) return;
+
+      // Fixed tasks are the only tasks that may repeat automatically.
+      // All non-fixed tasks are date-specific and must never "leak" into another month.
       if(t.date === ds){ out.push(t); return; }
-      if(t.recurring !== null && t.recurring === wd){
+
+      if(t.fixed && t.recurring !== null && t.recurring === wd){
         if(t.recurStart && ds < t.recurStart) return;
         if(t.recurEnd && ds > t.recurEnd) return;
         out.push(t);
       }
     });
+
+    // Flexible tasks are shown only on the exact date on which they were placed.
     (state.placements[ds]||[]).forEach(id=>{
       const t = getLib(id);
-      if(t) out.push(t);
+      if(t && !state.deletedTaskIds.includes(id) && !state.deletedTaskDates[`${ds}::${id}`] && !state.cancelledTaskDates[`${ds}::${id}`]){
+        if(!out.some(x=>x.id===t.id)) out.push(t);
+      }
     });
     return out;
   }
@@ -916,18 +981,21 @@
   }
 
   function monthKey(){ return `${state.year}-${state.month}`; }
-  function availabilityForPerson(name){
-    return state.availability[`${monthKey()}::${name}`] || {status:"available", reason:""};
+  function quotaForMonth(y,m){
+    const k=`${y}-${m}`;
+    return Number(state.quotaByMonth && state.quotaByMonth[k] !== undefined ? state.quotaByMonth[k] : 4) || 0;
   }
-  function isUnavailable(name){ return availabilityForPerson(name).status !== "available"; }
-  function manualHoursForPerson(name){
-    return (state.manualHours||[]).filter(x=>x.name===name && Number(x.year)===Number(state.year) && Number(x.month)===Number(state.month))
+  function availabilityForPerson(name, y=state.year, m=state.month){
+    return state.availability[`${y}-${m}::${name}`] || {status:"available", reason:""};
+  }
+  function isUnavailable(name, y=state.year, m=state.month){ return availabilityForPerson(name,y,m).status !== "available"; }
+  function manualHoursForPerson(name, y=state.year, m=state.month){
+    return (state.manualHours||[]).filter(x=>x.name===name && Number(x.year)===Number(y) && Number(x.month)===Number(m))
       .reduce((sum,x)=>sum+(Number(x.hours)||0),0);
   }
 
-  function monthHoursForPerson(name){
+  function monthHoursForPersonAt(name,y,m){
     let quotaHrs = 0, extraHrs = 0;
-    const y = state.year, m = state.month;
     const daysInMonth = new Date(y, m+1, 0).getDate();
     for(let d=1; d<=daysInMonth; d++){
       const ds = dateStr(y,m,d);
@@ -940,9 +1008,10 @@
         }
       });
     }
-    quotaHrs += manualHoursForPerson(name);
+    quotaHrs += manualHoursForPerson(name,y,m);
     return {quotaHrs, extraHrs};
   }
+  function monthHoursForPerson(name){ return monthHoursForPersonAt(name,state.year,state.month); }
 
   let viewMode = "grid"; // "grid" | "list"
 
@@ -951,7 +1020,7 @@
     renderCalendar();
     renderAgendaList();
     renderSummary();
-    document.getElementById("quotaTag").textContent = `${state.quota} ש׳ לחודש`;
+    document.getElementById("quotaTag").textContent = `${quotaForMonth(state.year,state.month)} ש׳ לחודש`;
   }
 
   document.getElementById("viewGridBtn").addEventListener("click", ()=>{
@@ -1082,8 +1151,9 @@
       const unavailable = isUnavailable(p.name);
       const av = availabilityForPerson(p.name);
       const {quotaHrs, extraHrs} = monthHoursForPerson(p.name);
-      const pct = unavailable ? 100 : Math.min(100, (quotaHrs / state.quota) * 100 || 0);
-      const barClass = unavailable ? "full" : (quotaHrs >= state.quota ? (quotaHrs > state.quota ? "over":"full") : "");
+      const currentQuota = quotaForMonth(state.year,state.month);
+      const pct = unavailable ? 100 : Math.min(100, (quotaHrs / currentQuota) * 100 || 0);
+      const barClass = unavailable ? "full" : (quotaHrs >= currentQuota ? (quotaHrs > currentQuota ? "over":"full") : "");
       const row = document.createElement("div");
       row.className = "prow";
       row.innerHTML = unavailable ? `
@@ -1334,11 +1404,13 @@
     state.month--;
     if(state.month<0){state.month=11; state.year--;}
     render();
+    renderQuotaTab();
   });
   document.getElementById("nextMonth").addEventListener("click", ()=>{
     state.month++;
     if(state.month>11){state.month=0; state.year++;}
     render();
+    renderQuotaTab();
   });
 
   // ---------- PIN / unlock ----------
@@ -1415,6 +1487,12 @@
       tab.classList.add("on");
       document.getElementById("tab-"+tab.dataset.tab).classList.add("on");
       if(tab.dataset.tab === "exceptions") renderExceptionsTab();
+      if(tab.dataset.tab === "annual"){
+        initAnnualReportControls();
+        const out=document.getElementById("annualReportOut");
+        try{ if(out) out.value=buildAnnualReport(); }
+        catch(err){ console.error("Annual report error",err); if(out) out.value="לא ניתן להפיק את הדוח כרגע. בדוק את Console."; }
+      }
       if(tab.dataset.tab === "share"){
         document.getElementById("shareOut").value = buildShareText();
       }
@@ -1422,21 +1500,82 @@
   });
 
   function renderQuotaTab(){
-    document.getElementById("quotaCustom").value = state.quota;
-    document.getElementById("q3").classList.toggle("on", state.quota===2);
-    document.getElementById("q4").classList.toggle("on", state.quota===4);
+    const selY=document.getElementById("quotaYearSelect");
+    const selM=document.getElementById("quotaMonthSelect");
+    const custom=document.getElementById("quotaCustom");
+    const label=document.getElementById("quotaMonthLabel");
+
+    if(selY){
+      selY.innerHTML = Array.from({length:5},(_,i)=>2026+i)
+        .map(y=>`<option value="${y}">${y}</option>`).join("");
+      if(!selY.value || Number(selY.value)<2026 || Number(selY.value)>2030) selY.value=String(state.year>=2026&&state.year<=2030?state.year:2026);
+    }
+    if(selM){
+      selM.innerHTML = HE_MONTHS.map((name,i)=>`<option value="${i}">${name}</option>`).join("");
+      if(!selM.value) selM.value=String(state.month);
+    }
+
+    const y=selY ? Number(selY.value) : state.year;
+    const m=selM ? Number(selM.value) : state.month;
+    const q=quotaForMonth(y,m);
+    if(label) label.textContent = `${HE_MONTHS[m]} ${y}`;
+    if(custom) custom.value = q;
+    document.getElementById("q3").classList.toggle("on", q===2);
+    document.getElementById("q4").classList.toggle("on", q===4);
   }
-  document.getElementById("q3").addEventListener("click", ()=>{ state.quota=2; saveState(); render(); renderQuotaTab(); });
-  document.getElementById("q4").addEventListener("click", ()=>{ state.quota=4; saveState(); render(); renderQuotaTab(); });
+
+  function setQuotaForSelectedMonth(v){
+    const sy=document.getElementById("quotaYearSelect");
+    const sm=document.getElementById("quotaMonthSelect");
+    const y=sy ? Number(sy.value) : state.year;
+    const m=sm ? Number(sm.value) : state.month;
+    if(y<2026 || y>2030 || m<0 || m>11) return;
+    state.quotaByMonth[`${y}-${m}`]=Number(v)||0;
+    if(y===state.year && m===state.month) state.quota=Number(v)||0;
+    saveState();
+    render();
+    renderQuotaTab();
+  }
+
+  document.getElementById("q3").addEventListener("click", ()=>setQuotaForSelectedMonth(2));
+  document.getElementById("q4").addEventListener("click", ()=>setQuotaForSelectedMonth(4));
+  document.getElementById("quotaMonthSelect").addEventListener("change", renderQuotaTab);
+  document.getElementById("quotaYearSelect").addEventListener("change", renderQuotaTab);
   document.getElementById("quotaCustom").addEventListener("change", (e)=>{
     const v = parseFloat(e.target.value);
-    if(!isNaN(v) && v>=0){ state.quota=v; saveState(); render(); renderQuotaTab(); }
+    if(!isNaN(v) && v>=0) setQuotaForSelectedMonth(v);
   });
+
+  function deleteTaskPermanently(taskId){
+    state.deletedTaskIds = Array.isArray(state.deletedTaskIds) ? state.deletedTaskIds : [];
+    if(!state.deletedTaskIds.includes(taskId)) state.deletedTaskIds.push(taskId);
+
+    // Remove the task from the library and every dated placement/assignment.
+    state.library = (state.library||[]).filter(x=>x.id!==taskId);
+    Object.keys(state.placements||{}).forEach(ds=>{
+      state.placements[ds] = (state.placements[ds]||[]).filter(id=>id!==taskId);
+    });
+    Object.keys(state.assignments||{}).forEach(k=>{
+      if(k.endsWith(`::${taskId}`)) delete state.assignments[k];
+    });
+    Object.keys(state.cancelledTaskDates||{}).forEach(k=>{
+      if(k.endsWith(`::${taskId}`)) delete state.cancelledTaskDates[k];
+    });
+    Object.keys(state.hoursOverride||{}).forEach(k=>{
+      if(k.endsWith(`::${taskId}`)) delete state.hoursOverride[k];
+    });
+    Object.keys(state.timeOverride||{}).forEach(k=>{
+      if(k.endsWith(`::${taskId}`)) delete state.timeOverride[k];
+    });
+    Object.keys(state.deletedTaskDates||{}).forEach(k=>{
+      if(k.endsWith(`::${taskId}`)) delete state.deletedTaskDates[k];
+    });
+  }
 
   function renderLibList(){
     const box = document.getElementById("libList");
     box.innerHTML = "";
-    state.library.forEach(t=>{
+    state.library.filter(t=>!state.deletedTaskIds.includes(t.id)).forEach(t=>{
       const item = document.createElement("div");
       item.className = "lib-item";
       let typeLabel = t.date ? `תאריך קבוע: ${t.date}` : (t.recurring!==null ? `חוזרת כל ${HE_WD[t.recurring]}${(t.recurStart||t.recurEnd) ? ` (${t.recurStart||'ללא התחלה'} עד ${t.recurEnd||'ללא סוף'})` : ' (ללא הגבלת חודשים)'}` : "משימה גמישה");
@@ -1513,12 +1652,11 @@
         delBtn.addEventListener("click", ()=>{
           if(confirm("למחוק את המשימה מהספרייה?")){
             requestDeleteUnlock(()=>{
-              state.library = state.library.filter(x=>x.id!==t.id);
-              if(!state.deletedTaskIds.includes(t.id)) state.deletedTaskIds.push(t.id);
-              Object.keys(state.placements).forEach(ds=>{
-                state.placements[ds] = state.placements[ds].filter(id=>id!==t.id);
-              });
-              saveState(); render(); renderLibList();
+              deleteTaskPermanently(t.id);
+              // Render immediately so the deleted task disappears before the cloud round-trip.
+              renderLibList();
+              render();
+              saveState();
             });
           }
         });
@@ -1735,6 +1873,54 @@
     renderLibList();
   });
 
+  // ---------- annual report ----------
+  function initAnnualReportControls(){
+    const ys=document.getElementById("annualYear"), ms=document.getElementById("annualStartMonth");
+    if(!ys||!ms) return;
+    const years=[]; for(let y=2026;y<=2030;y++) years.push(y);
+    ys.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join("");
+    ys.value=String(state.year);
+    ms.innerHTML=HE_MONTHS.map((n,i)=>`<option value="${i}">${n}</option>`).join("");
+    ms.value=String(state.year===2026?8:0);
+    const out=document.getElementById("annualReportOut");
+    if(out && !out.value) out.value=buildAnnualReport();
+  }
+  function buildAnnualReport(){
+    const y=Number(document.getElementById("annualYear").value);
+    const start=Number(document.getElementById("annualStartMonth").value);
+    const end=11;
+    const lines=[];
+    lines.push(`📊 דוח פעילות שנתי - כיתת כוננות קריית מלאכי`);
+    lines.push(`שנת ${y} | ${HE_MONTHS[start]} עד ${HE_MONTHS[end]} ${y}`);
+    lines.push("");
+    state.roster.forEach(p=>{
+      let total=0,target=0,deficit=false;
+      for(let m=start;m<=end;m++){
+        const q=quotaForMonth(y,m); const av=availabilityForPerson(p.name,y,m); const h=monthHoursForPersonAt(p.name,y,m).quotaHrs;
+        if(av.status!=="available") continue;
+        target+=q; total+=h; if(h<q) deficit=true;
+      }
+      const mark=deficit?"🔴 ":"";
+      lines.push(`${mark}*${p.name}* - ${Math.round(total*10)/10} מתוך ${Math.round(target*10)/10} שעות`);
+    });
+    lines.push("");
+    lines.push("━━━━━━━━━━━━━━");
+    lines.push("פירוט חודשי");
+    for(let m=start;m<=end;m++){
+      const q=quotaForMonth(y,m);
+      lines.push(""); lines.push(`📅 ${HE_MONTHS[m]} ${y} - מכסה ${q} ש׳`);
+      state.roster.forEach(p=>{
+        const av=availabilityForPerson(p.name,y,m);
+        if(av.status!=="available"){ lines.push(`⏸️ *${p.name}* - לא זמין`); return; }
+        const h=Math.round(monthHoursForPersonAt(p.name,y,m).quotaHrs*10)/10;
+        const mark=h<q?"🔴 ":"";
+        lines.push(`${mark}*${p.name}* - ${h} ש׳`);
+      });
+    }
+    lines.push(""); lines.push("🔴 = חסר למכסה ואינו מוגדר כלא זמין");
+    return lines.join("\n");
+  }
+
   // ---------- WhatsApp-friendly share text ----------
   function buildShareText(){
     const y = state.year, m = state.month;
@@ -1775,7 +1961,7 @@
     state.roster.forEach(p=>{
       const {quotaHrs} = monthHoursForPerson(p.name);
       const rounded = Math.round(quotaHrs * 10) / 10;
-      const quota = Number(state.quota) || 0;
+      const quota = quotaForMonth(y,m);
       if(isUnavailable(p.name)){
         const av=availabilityForPerson(p.name);
         unavailablePeople.push({name:p.name,status:av.status,reason:av.reason});
@@ -1799,11 +1985,11 @@
 
     if(belowQuota.length){
       lines.push("");
-      lines.push(`⚠️ חסר למכסה החודשית (${state.quota} ש׳):`);
+      lines.push(`⚠️ חסר למכסה החודשית (${quota} ש׳):`);
       belowQuota.forEach(p=>lines.push(`• *${p.name}*: חסרות ${p.gap} ש׳ (בוצעו ${p.hours} ש׳)`));
     }else{
       lines.push("");
-      lines.push(`✅ כולם הגיעו למכסה של ${state.quota} ש׳`);
+      lines.push(`✅ כולם הגיעו למכסה של ${quota} ש׳`);
     }
 
     if(unavailablePeople.length){
@@ -1861,6 +2047,16 @@
     }
   });
 
+  document.getElementById("annualYear").addEventListener("change", ()=>{
+    const y=Number(document.getElementById("annualYear").value);
+    document.getElementById("annualStartMonth").value=String(y===2026?8:0);
+  });
+  document.getElementById("generateAnnualReport").addEventListener("click", ()=>{
+    document.getElementById("annualReportOut").value=buildAnnualReport();
+  });
+  document.getElementById("copyAnnualReport").addEventListener("click", ()=>{ const ta=document.getElementById("annualReportOut"); if(!ta.value) ta.value=buildAnnualReport(); ta.select(); ta.setSelectionRange(0,999999); try{document.execCommand("copy"); alert("הדוח הועתק");}catch(e){alert("סמנו את הדוח והעתיקו ידנית");} });
+
+  initAnnualReportControls();
   loadState().catch(e=>console.error("שגיאת אתחול",e));
 })();
 </script>
