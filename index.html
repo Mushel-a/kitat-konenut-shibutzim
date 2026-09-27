@@ -758,6 +758,12 @@
       });
       pushOnce("nonfixed-no-cross-month");
     }
+    if(!state.appliedMigrations.includes("fixed-only-recurrence-v2")){
+      state.library.forEach(t=>{
+        if(!t.fixed && t.recurring !== null && !t.date) t.recurring = null;
+      });
+      pushOnce("fixed-only-recurrence-v2");
+    }
   }
 
   async function loadState(){
@@ -952,7 +958,9 @@
       // All non-fixed tasks are date-specific and must never "leak" into another month.
       if(t.date === ds){ out.push(t); return; }
 
-      if(t.fixed && t.recurring !== null && t.recurring === wd){
+      // Only tasks explicitly marked fixed may recur. A custom/non-fixed task
+      // can appear only on its exact date through `date` or `placements`.
+      if(t.fixed === true && t.recurring !== null && t.recurring === wd){
         if(t.recurStart && ds < t.recurStart) return;
         if(t.recurEnd && ds > t.recurEnd) return;
         out.push(t);
@@ -1505,18 +1513,27 @@
     const custom=document.getElementById("quotaCustom");
     const label=document.getElementById("quotaMonthLabel");
 
+    // The pilot starts in September 2026. Do not expose Jan-Aug 2026.
+    const previousY = selY && selY.dataset.selected ? Number(selY.dataset.selected) : null;
+    const previousM = selM && selM.dataset.selected ? Number(selM.dataset.selected) : null;
+    let y = (previousY>=2026 && previousY<=2030) ? previousY : (state.year>=2026 && state.year<=2030 ? state.year : 2026);
+    let m = previousM!==null && previousM>=0 && previousM<=11 ? previousM : state.month;
+    if(y===2026 && m<8) m=8;
+
     if(selY){
       selY.innerHTML = Array.from({length:5},(_,i)=>2026+i)
-        .map(y=>`<option value="${y}">${y}</option>`).join("");
-      if(!selY.value || Number(selY.value)<2026 || Number(selY.value)>2030) selY.value=String(state.year>=2026&&state.year<=2030?state.year:2026);
+        .map(yy=>`<option value="${yy}">${yy}</option>`).join("");
+      selY.value=String(y);
+      selY.dataset.selected=String(y);
     }
     if(selM){
-      selM.innerHTML = HE_MONTHS.map((name,i)=>`<option value="${i}">${name}</option>`).join("");
-      if(!selM.value) selM.value=String(state.month);
+      const firstMonth = y===2026 ? 8 : 0;
+      selM.innerHTML = HE_MONTHS.map((name,i)=> i>=firstMonth ? `<option value="${i}">${name}</option>` : "").join("");
+      if(m<firstMonth) m=firstMonth;
+      selM.value=String(m);
+      selM.dataset.selected=String(m);
     }
 
-    const y=selY ? Number(selY.value) : state.year;
-    const m=selM ? Number(selM.value) : state.month;
     const q=quotaForMonth(y,m);
     if(label) label.textContent = `${HE_MONTHS[m]} ${y}`;
     if(custom) custom.value = q;
@@ -1539,8 +1556,18 @@
 
   document.getElementById("q3").addEventListener("click", ()=>setQuotaForSelectedMonth(2));
   document.getElementById("q4").addEventListener("click", ()=>setQuotaForSelectedMonth(4));
-  document.getElementById("quotaMonthSelect").addEventListener("change", renderQuotaTab);
-  document.getElementById("quotaYearSelect").addEventListener("change", renderQuotaTab);
+  document.getElementById("quotaMonthSelect").addEventListener("change", (e)=>{
+    e.target.dataset.selected=e.target.value;
+    const y=document.getElementById("quotaYearSelect");
+    y.dataset.selected=y.value;
+    renderQuotaTab();
+  });
+  document.getElementById("quotaYearSelect").addEventListener("change", (e)=>{
+    e.target.dataset.selected=e.target.value;
+    const m=document.getElementById("quotaMonthSelect");
+    m.dataset.selected="";
+    renderQuotaTab();
+  });
   document.getElementById("quotaCustom").addEventListener("change", (e)=>{
     const v = parseFloat(e.target.value);
     if(!isNaN(v) && v>=0) setQuotaForSelectedMonth(v);
@@ -1548,27 +1575,22 @@
 
   function deleteTaskPermanently(taskId){
     state.deletedTaskIds = Array.isArray(state.deletedTaskIds) ? state.deletedTaskIds : [];
+    // Tombstone first. This prevents DEFAULT_LIBRARY migrations and other clients
+    // from recreating the task after it has been deliberately deleted.
     if(!state.deletedTaskIds.includes(taskId)) state.deletedTaskIds.push(taskId);
 
-    // Remove the task from the library and every dated placement/assignment.
     state.library = (state.library||[]).filter(x=>x.id!==taskId);
     Object.keys(state.placements||{}).forEach(ds=>{
       state.placements[ds] = (state.placements[ds]||[]).filter(id=>id!==taskId);
+      if(!state.placements[ds].length) delete state.placements[ds];
     });
-    Object.keys(state.assignments||{}).forEach(k=>{
-      if(k.endsWith(`::${taskId}`)) delete state.assignments[k];
-    });
-    Object.keys(state.cancelledTaskDates||{}).forEach(k=>{
-      if(k.endsWith(`::${taskId}`)) delete state.cancelledTaskDates[k];
-    });
-    Object.keys(state.hoursOverride||{}).forEach(k=>{
-      if(k.endsWith(`::${taskId}`)) delete state.hoursOverride[k];
-    });
-    Object.keys(state.timeOverride||{}).forEach(k=>{
-      if(k.endsWith(`::${taskId}`)) delete state.timeOverride[k];
-    });
-    Object.keys(state.deletedTaskDates||{}).forEach(k=>{
-      if(k.endsWith(`::${taskId}`)) delete state.deletedTaskDates[k];
+    for(const bagName of ["assignments","cancelledTaskDates","hoursOverride","timeOverride","deletedTaskDates"]){
+      const bag=state[bagName]||{};
+      Object.keys(bag).forEach(k=>{ if(k.endsWith(`::${taskId}`)) delete bag[k]; });
+    }
+    // Also remove any accidental direct references to this task from dated data.
+    Object.keys(state).forEach(k=>{
+      if(k.endsWith(`::${taskId}`) && state[k] && typeof state[k]==="object") delete state[k];
     });
   }
 
@@ -1653,10 +1675,10 @@
           if(confirm("למחוק את המשימה מהספרייה?")){
             requestDeleteUnlock(()=>{
               deleteTaskPermanently(t.id);
+              saveState();
               // Render immediately so the deleted task disappears before the cloud round-trip.
               renderLibList();
               render();
-              saveState();
             });
           }
         });
