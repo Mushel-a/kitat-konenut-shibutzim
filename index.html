@@ -543,6 +543,20 @@
         <option value="recurring">קבועה – חוזרת כל שבוע ביום מסוים</option>
       </select>
     </div>
+    <div class="field" id="ntValidityField">
+      <label>תקופת תוקף למשימה (למשימות שאינן ברזל)</label>
+      <div class="row2">
+        <div class="field" style="margin:0;">
+          <label>מתאריך</label>
+          <input type="text" id="ntStartDate" placeholder="YYYY-MM-DD">
+        </div>
+        <div class="field" style="margin:0;">
+          <label>עד תאריך</label>
+          <input type="text" id="ntEndDate" placeholder="YYYY-MM-DD">
+        </div>
+      </div>
+      <div class="small-note">אפשר להשאיר "עד תאריך" ריק. משימה שאינה ברזל לא תוצג מחוץ לטווח הזה.</div>
+    </div>
     <div class="field" id="ntDateField" style="display:none;">
       <label>תאריך</label>
       <input type="text" id="ntDate" placeholder="YYYY-MM-DD">
@@ -971,6 +985,9 @@
     (state.placements[ds]||[]).forEach(id=>{
       const t = getLib(id);
       if(t && !state.deletedTaskIds.includes(id) && !state.deletedTaskDates[`${ds}::${id}`] && !state.cancelledTaskDates[`${ds}::${id}`]){
+        // Non-fixed tasks may only be used inside their explicitly defined validity window.
+        if(!t.fixed && t.validFrom && ds < t.validFrom) return;
+        if(!t.fixed && t.validTo && ds > t.validTo) return;
         if(!out.some(x=>x.id===t.id)) out.push(t);
       }
     });
@@ -1317,7 +1334,9 @@
     const box = document.getElementById("flexChoices");
     box.innerHTML = "";
     const already = new Set(instancesForDate(currentDay.y,currentDay.m,currentDay.d).map(t=>t.id));
-    const options = state.library.filter(t=> t.date===null && t.recurring===null && !already.has(t.id));
+    const options = state.library.filter(t=> t.custom === true && t.date===null && t.recurring===null && !t.fixed && !state.deletedTaskIds.includes(t.id) && !already.has(t.id)
+      && (!t.validFrom || currentDay.ds >= t.validFrom)
+      && (!t.validTo || currentDay.ds <= t.validTo));
     if(!options.length){
       box.innerHTML = '<div class="small-note">אין משימות גמישות נוספות בספרייה שאינן כבר ביום זה.</div>';
     }
@@ -1344,8 +1363,12 @@
     const hours = parseFloat(document.getElementById("quickTaskHours").value) || 0;
     const quota = document.getElementById("quickTaskQuota").value === "1";
     const desc = document.getElementById("quickTaskDesc").value.trim();
+    const validTo = prompt("עד איזה תאריך המשימה תקפה? השאר ריק אם היא תקפה רק ליום הזה.", currentDay.ds);
+    if(validTo !== null && validTo.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(validTo.trim())){ alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); return; }
+    const endDate = (validTo||"").trim() || currentDay.ds;
+    if(endDate < currentDay.ds){ alert("תאריך הסיום חייב להיות ביום המשימה או אחריו"); return; }
     const id = "c_" + Date.now();
-    const newTask = {id, name, hours, quota, date:null, recurring:null, custom:true, time:"20:00", desc};
+    const newTask = {id, name, hours, quota, date:null, recurring:null, custom:true, fixed:false, validFrom:currentDay.ds, validTo:endDate, time:"20:00", desc};
     state.library.push(newTask);
     if(!state.placements[currentDay.ds]) state.placements[currentDay.ds] = [];
     state.placements[currentDay.ds].push(id);
@@ -1600,7 +1623,7 @@
     state.library.filter(t=>!state.deletedTaskIds.includes(t.id)).forEach(t=>{
       const item = document.createElement("div");
       item.className = "lib-item";
-      let typeLabel = t.date ? `תאריך קבוע: ${t.date}` : (t.recurring!==null ? `חוזרת כל ${HE_WD[t.recurring]}${(t.recurStart||t.recurEnd) ? ` (${t.recurStart||'ללא התחלה'} עד ${t.recurEnd||'ללא סוף'})` : ' (ללא הגבלת חודשים)'}` : "משימה גמישה");
+      let typeLabel = t.date ? `תאריך קבוע: ${t.date}` : (t.recurring!==null ? `חוזרת כל ${HE_WD[t.recurring]}${(t.recurStart||t.recurEnd) ? ` (${t.recurStart||'ללא התחלה'} עד ${t.recurEnd||'ללא סוף'})` : ' (ללא הגבלת חודשים)'}` : `משימה גמישה${t.validFrom||t.validTo ? ` (${t.validFrom||'ללא התחלה'} עד ${t.validTo||'ללא סוף'})` : ''}`);
       item.innerHTML = `
         <div class="li-top">
           <input type="text" value="${t.name.replace(/"/g,'&quot;')}" data-role="name" class="li-name-input">
@@ -1859,6 +1882,8 @@
     document.getElementById("ntHours").value = 2;
     document.getElementById("ntType").value = "flex";
     document.getElementById("ntDate").value = "";
+    document.getElementById("ntStartDate").value = currentDay ? currentDay.ds : "";
+    document.getElementById("ntEndDate").value = "";
     document.getElementById("ntQuota").value = "1";
     document.getElementById("ntDesc").value = "";
     document.getElementById("ntDateField").style.display = "none";
@@ -1872,6 +1897,12 @@
     document.getElementById("ntDateField").style.display = e.target.value==="date" ? "block":"none";
     document.getElementById("ntWeekdayField").style.display = e.target.value==="recurring" ? "block":"none";
   });
+  function validateDateRange(start,end){
+    if(start && !/^\d{4}-\d{2}-\d{2}$/.test(start)) return "תאריך התחלה לא תקין";
+    if(end && !/^\d{4}-\d{2}-\d{2}$/.test(end)) return "תאריך סיום לא תקין";
+    if(start && end && end < start) return "תאריך הסיום חייב להיות אחרי תאריך ההתחלה";
+    return "";
+  }
   document.getElementById("ntSave").addEventListener("click", ()=>{
     const name = document.getElementById("ntName").value.trim();
     if(!name){ alert("יש להזין שם משימה"); return; }
@@ -1880,6 +1911,13 @@
     const quota = document.getElementById("ntQuota").value === "1";
     const id = "c_" + Date.now();
     let date = null, recurring = null;
+    let validFrom = null, validTo = null;
+    if(type!=="date" && type!=="recurring"){
+      validFrom = document.getElementById("ntStartDate").value.trim() || null;
+      validTo = document.getElementById("ntEndDate").value.trim() || null;
+      const rangeErr = validateDateRange(validFrom, validTo);
+      if(rangeErr){ alert(rangeErr); return; }
+    }
     if(type==="date"){
       date = document.getElementById("ntDate").value.trim();
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); return; }
@@ -1888,7 +1926,7 @@
       recurring = parseInt(document.getElementById("ntWeekday").value, 10);
     }
     const desc = document.getElementById("ntDesc").value.trim();
-    state.library.push({id, name, hours, quota, date, recurring, custom:true, time:"20:00", desc});
+    state.library.push({id, name, hours, quota, date, recurring, custom:true, fixed:false, validFrom, validTo, time:"20:00", desc});
     saveState();
     document.getElementById("newTaskOverlay").classList.remove("show");
     render();
