@@ -219,7 +219,7 @@
   .lib-item{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-bottom:8px;}
   .lib-item .li-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .lib-item .li-name{font-size:13px;font-weight:700;flex:1;}
-  .lib-item .li-del{background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px 6px;}
+  .lib-item .li-end{border:1px solid #c7d3dd;background:#eef3f7;color:#355064;border-radius:8px;padding:6px 9px;cursor:pointer;font-weight:800}.li-end:hover{background:#e1ebf2}.li-del{background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px 6px;}
   .lib-item .li-controls{display:flex;gap:8px;margin-top:8px;align-items:center;}
   .lib-item .li-controls input[type=number]{width:56px;padding:5px 6px;font-size:12px;}
   .mini-toggle{font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;color:var(--steel-dim);}
@@ -674,6 +674,7 @@
     deletedTaskIds: [],    // built-in/custom task ids explicitly deleted by the user
     cancelledTaskDates: {}, // "date::taskId" -> true, for one-day cancellations including fixed tasks
     deletedTaskDates: {},   // "date::taskId" -> true, for explicit deletion of a task occurrence
+    endedTaskDates: {},      // taskId -> YYYY-MM-DD, stops future manual placement while preserving history
     manualHours: [],        // {id, name, hours, reason, year, month}
     availability: {},       // "year-month::name" -> {status, reason}
     appliedMigrations: ["sep2026-holiday-hours", "sep2026-weekly-hours", "sep2026-recur-scope", "sep2026-desc-hours", "sep2026-thu-fix", "sep2026-fixed-schedules", "sep2026-holidays-not-fixed", "sep2026-holiday-times-v2"]
@@ -732,6 +733,7 @@
     if(!state.timeOverride) state.timeOverride = {};
     if(!state.cancelledTaskDates) state.cancelledTaskDates = {};
     if(!state.deletedTaskDates) state.deletedTaskDates = {};
+    if(!state.endedTaskDates) state.endedTaskDates = {};
     if(!Array.isArray(state.manualHours)) state.manualHours = [];
     if(!state.availability) state.availability = {};
     if(!state.quotaByMonth || typeof state.quotaByMonth !== "object") state.quotaByMonth = {};
@@ -1335,6 +1337,7 @@
     box.innerHTML = "";
     const already = new Set(instancesForDate(currentDay.y,currentDay.m,currentDay.d).map(t=>t.id));
     const options = state.library.filter(t=> t.custom === true && t.date===null && t.recurring===null && !t.fixed && !state.deletedTaskIds.includes(t.id) && !already.has(t.id)
+      && (!state.endedTaskDates[t.id] || currentDay.ds <= state.endedTaskDates[t.id])
       && (!t.validFrom || currentDay.ds >= t.validFrom)
       && (!t.validTo || currentDay.ds <= t.validTo));
     if(!options.length){
@@ -1611,6 +1614,7 @@
       const bag=state[bagName]||{};
       Object.keys(bag).forEach(k=>{ if(k.endsWith(`::${taskId}`)) delete bag[k]; });
     }
+    if(state.endedTaskDates) delete state.endedTaskDates[taskId];
     // Also remove any accidental direct references to this task from dated data.
     Object.keys(state).forEach(k=>{
       if(k.endsWith(`::${taskId}`) && state[k] && typeof state[k]==="object") delete state[k];
@@ -1623,11 +1627,11 @@
     state.library.filter(t=>!state.deletedTaskIds.includes(t.id)).forEach(t=>{
       const item = document.createElement("div");
       item.className = "lib-item";
-      let typeLabel = t.date ? `תאריך קבוע: ${t.date}` : (t.recurring!==null ? `חוזרת כל ${HE_WD[t.recurring]}${(t.recurStart||t.recurEnd) ? ` (${t.recurStart||'ללא התחלה'} עד ${t.recurEnd||'ללא סוף'})` : ' (ללא הגבלת חודשים)'}` : `משימה גמישה${t.validFrom||t.validTo ? ` (${t.validFrom||'ללא התחלה'} עד ${t.validTo||'ללא סוף'})` : ''}`);
+      let typeLabel = t.date ? `תאריך קבוע: ${t.date}` : (t.recurring!==null ? `חוזרת כל ${HE_WD[t.recurring]}${(t.recurStart||t.recurEnd) ? ` (${t.recurStart||'ללא התחלה'} עד ${t.recurEnd||'ללא סוף'})` : ' (ללא הגבלת חודשים)'}` : `משימה גמישה${t.validFrom||t.validTo||state.endedTaskDates[t.id] ? ` (${t.validFrom||'ללא התחלה'} עד ${t.validTo||state.endedTaskDates[t.id]||'ללא סוף'})` : ''}`);
       item.innerHTML = `
         <div class="li-top">
           <input type="text" value="${t.name.replace(/"/g,'&quot;')}" data-role="name" class="li-name-input">
-          <button class="li-del" title="מחק משימה">✕</button>
+          <button class="li-end" title="סיים משימה">⏹</button><button class="li-del" title="מחק משימה">✕</button>
         </div>
         <div class="t-meta">${typeLabel}</div>
         <div class="li-controls">
@@ -1692,6 +1696,22 @@
         e.target.textContent = t.quota?'נספר במכסה':'בחירה נוספת';
         saveState(); render();
       });
+      const endBtn = item.querySelector(".li-end");
+      if(endBtn){
+        endBtn.addEventListener("click", ()=>{
+          if(t.fixed){ alert("משימת ברזל לא ניתן לסיים דרך אפשרות זו."); return; }
+          const defaultEnd = state.endedTaskDates[t.id] || t.validTo || dateStr(state.year,state.month+1,0);
+          const end = prompt("עד איזה תאריך המשימה תהיה פעילה? ההיסטוריה שכבר נמצאת ביומן תישאר.", defaultEnd);
+          if(end===null) return;
+          const v=end.trim();
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); return; }
+          state.endedTaskDates[t.id]=v;
+          t.validTo=v;
+          saveState();
+          renderLibList();
+          render();
+        });
+      }
       const delBtn = item.querySelector(".li-del");
       if(delBtn){
         delBtn.addEventListener("click", ()=>{
