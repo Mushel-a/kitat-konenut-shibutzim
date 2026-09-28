@@ -548,18 +548,18 @@
       <div class="row2">
         <div class="field" style="margin:0;">
           <label>מתאריך</label>
-          <input type="text" id="ntStartDate" placeholder="YYYY-MM-DD">
+          <input type="date" id="ntStartDate" aria-label="תאריך התחלה">
         </div>
         <div class="field" style="margin:0;">
           <label>עד תאריך</label>
-          <input type="text" id="ntEndDate" placeholder="YYYY-MM-DD">
+          <input type="date" id="ntEndDate" aria-label="תאריך סיום">
         </div>
       </div>
       <div class="small-note">אפשר להשאיר "עד תאריך" ריק. משימה שאינה ברזל לא תוצג מחוץ לטווח הזה.</div>
     </div>
     <div class="field" id="ntDateField" style="display:none;">
       <label>תאריך</label>
-      <input type="text" id="ntDate" placeholder="YYYY-MM-DD">
+      <input type="date" id="ntDate" aria-label="תאריך">
     </div>
     <div class="field" id="ntWeekdayField" style="display:none;">
       <label>יום בשבוע</label>
@@ -1367,7 +1367,7 @@
     const quota = document.getElementById("quickTaskQuota").value === "1";
     const desc = document.getElementById("quickTaskDesc").value.trim();
     const validTo = prompt("עד איזה תאריך המשימה תקפה? השאר ריק אם היא תקפה רק ליום הזה.", currentDay.ds);
-    if(validTo !== null && validTo.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(validTo.trim())){ alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); return; }
+    if(validTo !== null && validTo.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(validTo.trim())){ alert("תאריך לא תקין. בחר תאריך בפורמט יום/חודש/שנה"); return; }
     const endDate = (validTo||"").trim() || currentDay.ds;
     if(endDate < currentDay.ds){ alert("תאריך הסיום חייב להיות ביום המשימה או אחריו"); return; }
     const id = "c_" + Date.now();
@@ -1646,8 +1646,8 @@
         <div class="field" style="margin-top:8px;margin-bottom:0;">
           <label style="font-size:11px;">בתוקף רק בין התאריכים (ריק = ללא הגבלה, ירוץ גם בחודשים הבאים)</label>
           <div class="row2">
-            <input type="text" value="${t.recurStart||''}" data-role="recur-start" placeholder="מתאריך YYYY-MM-DD">
-            <input type="text" value="${t.recurEnd||''}" data-role="recur-end" placeholder="עד תאריך YYYY-MM-DD">
+            <input type="date" value="${t.recurStart||''}" data-role="recur-start" placeholder="">
+            <input type="date" value="${t.recurEnd||''}" data-role="recur-end" placeholder="">
           </div>
         </div>
         ` : ''}
@@ -1675,7 +1675,7 @@
         recurStartInput.addEventListener("change",(e)=>{
           const v = e.target.value.trim();
           if(v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v)){ t.recurStart = v || null; saveState(); render(); }
-          else{ e.target.value = t.recurStart||''; alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); }
+          else{ e.target.value = t.recurStart||''; alert("תאריך לא תקין. בחר תאריך בפורמט יום/חודש/שנה"); }
         });
       }
       const recurEndInput = item.querySelector('[data-role="recur-end"]');
@@ -1683,7 +1683,7 @@
         recurEndInput.addEventListener("change",(e)=>{
           const v = e.target.value.trim();
           if(v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v)){ t.recurEnd = v || null; saveState(); render(); }
-          else{ e.target.value = t.recurEnd||''; alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); }
+          else{ e.target.value = t.recurEnd||''; alert("תאריך לא תקין. בחר תאריך בפורמט יום/חודש/שנה"); }
         });
       }
       item.querySelector('[data-role="desc"]').addEventListener("change",(e)=>{
@@ -1704,7 +1704,7 @@
           const end = prompt("עד איזה תאריך המשימה תהיה פעילה? ההיסטוריה שכבר נמצאת ביומן תישאר.", defaultEnd);
           if(end===null) return;
           const v=end.trim();
-          if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); return; }
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ alert("תאריך לא תקין. בחר תאריך בפורמט יום/חודש/שנה"); return; }
           state.endedTaskDates[t.id]=v;
           t.validTo=v;
           saveState();
@@ -1918,8 +1918,8 @@
     document.getElementById("ntWeekdayField").style.display = e.target.value==="recurring" ? "block":"none";
   });
   function validateDateRange(start,end){
-    if(start && !/^\d{4}-\d{2}-\d{2}$/.test(start)) return "תאריך התחלה לא תקין";
-    if(end && !/^\d{4}-\d{2}-\d{2}$/.test(end)) return "תאריך סיום לא תקין";
+    if(start && !/^\d{4}-\d{2}-\d{2}$/.test(start)) return "תאריך התחלה לא תקין - בחר יום/חודש/שנה";
+    if(end && !/^\d{4}-\d{2}-\d{2}$/.test(end)) return "תאריך סיום לא תקין - בחר יום/חודש/שנה";
     if(start && end && end < start) return "תאריך הסיום חייב להיות אחרי תאריך ההתחלה";
     return "";
   }
@@ -1940,7 +1940,7 @@
     }
     if(type==="date"){
       date = document.getElementById("ntDate").value.trim();
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ alert("פורמט תאריך לא תקין. יש להשתמש ב-YYYY-MM-DD"); return; }
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ alert("תאריך לא תקין. בחר תאריך בפורמט יום/חודש/שנה"); return; }
     }
     if(type==="recurring"){
       recurring = parseInt(document.getElementById("ntWeekday").value, 10);
@@ -2109,23 +2109,48 @@
   window.buildShareText = buildShareText;
   window.openWhatsAppShare = openWhatsAppShare;
 
-  document.getElementById("genShareText").addEventListener("click", ()=>{
-    document.getElementById("shareOut").value = buildShareText();
-  });
+  const genShareTextBtn = document.getElementById("genShareText");
+  if(genShareTextBtn){
+    genShareTextBtn.onclick = function(e){
+      e.preventDefault();
+      try{
+        const text = buildShareText();
+        const out = document.getElementById("shareOut");
+        if(out) out.value = text;
+      }catch(err){
+        console.error("שגיאה ביצירת הודעת שיתוף", err);
+        alert("לא ניתן ליצור כרגע את הודעת השיתוף.");
+      }
+    };
+  }
 
-  document.getElementById("shareWhatsApp").addEventListener("click", openWhatsAppShare);
-  document.getElementById("shareCopy").addEventListener("click", ()=>{
-    const ta = document.getElementById("shareOut");
-    if(!ta.value){ ta.value = buildShareText(); }
-    ta.select();
-    ta.setSelectionRange(0, 999999);
-    try{
-      document.execCommand("copy");
-      alert("הטקסט הועתק — עכשיו אפשר להדביק אותו בוואטסאפ.");
-    }catch(e){
-      alert("סמנו את הטקסט בתיבה למעלה והעתיקו ידנית (Ctrl+C).");
-    }
-  });
+  const shareWhatsAppBtn = document.getElementById("shareWhatsApp");
+  if(shareWhatsAppBtn) shareWhatsAppBtn.onclick = openWhatsAppShare;
+
+  const shareCopyBtn = document.getElementById("shareCopy");
+  if(shareCopyBtn){
+    shareCopyBtn.onclick = function(){
+      const ta = document.getElementById("shareOut");
+      if(!ta) return;
+      try{
+        if(!ta.value) ta.value = buildShareText();
+        ta.focus();
+        ta.select();
+        ta.setSelectionRange(0, 999999);
+        if(navigator.clipboard && window.isSecureContext){
+          navigator.clipboard.writeText(ta.value).then(()=>alert("הטקסט הועתק — עכשיו אפשר להדביק אותו בוואטסאפ.")).catch(()=>{
+            document.execCommand("copy");
+            alert("הטקסט הועתק — עכשיו אפשר להדביק אותו בוואטסאפ.");
+          });
+        }else{
+          document.execCommand("copy");
+          alert("הטקסט הועתק — עכשיו אפשר להדביק אותו בוואטסאפ.");
+        }
+      }catch(e){
+        alert("סמנו את הטקסט בתיבה למעלה והעתיקו ידנית (Ctrl+C).");
+      }
+    };
+  }
 
   document.getElementById("annualYear").addEventListener("change", ()=>{
     const y=Number(document.getElementById("annualYear").value);
