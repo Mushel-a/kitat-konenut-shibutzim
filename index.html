@@ -339,9 +339,16 @@
     </div>
     <div class="row2">
       <div class="field">
-        <label>שעות</label>
-        <input type="number" id="quickTaskHours" value="2" min="0" step="0.5">
+        <label>שעת התחלה</label>
+        <input type="text" id="quickTaskStartTime" value="20:00" placeholder="HH:MM">
       </div>
+      <div class="field">
+        <label>שעת סיום</label>
+        <input type="text" id="quickTaskEndTime" value="22:00" placeholder="HH:MM">
+      </div>
+    </div>
+    <div class="small-note" id="quickTaskHoursPreview" style="margin-top:-4px;margin-bottom:8px;">סה״כ: 2 שעות</div>
+    <div class="row2">
       <div class="field">
         <label>נספר במכסה?</label>
         <select id="quickTaskQuota">
@@ -424,14 +431,30 @@
     </div>
 
     <div class="tabpane" id="tab-roster">
-      <div class="small-note">רשימת חברי הכיתה. אפשר להוסיף/להסיר לפי שינויים.</div>
+      <div class="small-note">כאן מנהלים את כוח האדם לפי חודש. הסטטוס נקבע ידנית לכל חבר בחודש שנבחר, ללא תאריכי התחלה/סיום.</div>
+      <div class="row2" style="margin-top:10px;">
+        <div class="field" style="margin:0;flex:1;"><label>שנה</label><select id="rosterYear"></select></div>
+        <div class="field" style="margin:0;flex:1;"><label>חודש</label><select id="rosterMonth"></select></div>
+      </div>
+      <div class="small-note" id="rosterSelectedLabel" style="margin-top:8px;"></div>
       <div id="rosterMgmt"></div>
-      <div class="field" style="margin-top:8px;">
+      <div class="section-title" style="margin-top:16px;">שעות יזומות לחודש</div>
+      <div class="small-note">התנדבות, מטווח או פעילות מוכרת אחרת. השעות נספרות במכסה של החודש שנבחר.</div>
+      <div class="row2"><select id="manualHourPerson"></select><input type="number" id="manualHourValue" min="0" step="0.5" value="1" placeholder="שעות"></div>
+      <div class="field" style="margin-top:8px;"><input type="text" id="manualHourReason" placeholder="סיבה, למשל: מטווח / התנדבות במקום"></div>
+      <button class="edit-btn" id="addManualHours">＋ הוספת שעות</button>
+      <div class="section-title" style="margin-top:14px;">תיקון שעות</div>
+      <div class="small-note">להפחתת שעות במקרה של שיבוץ בטעות, הזן מספר שלילי. התיקון משפיע רק על מכסת החודש הנבחר.</div>
+      <div class="row2">
+        <select id="adjustHourPerson" style="flex:1;"></select>
+        <input type="number" id="adjustHourValue" step="0.5" value="-1" placeholder="+/- שעות">
+      </div>
+      <div class="field" style="margin-top:8px;"><input type="text" id="adjustHourReason" placeholder="סיבת התיקון"></div>
+      <button class="edit-btn" id="addHourAdjustment">＋ הוספת תיקון שעות</button>
+      <div id="manualHoursList" style="margin-top:10px;"></div>
+      <div class="field" style="margin-top:18px;">
         <label>הוספת חבר כיתה</label>
-        <div class="row2">
-          <input type="text" id="newPersonName" placeholder="שם מלא">
-          <button class="edit-btn" style="flex:0 0 auto;padding:9px 16px;" id="addPerson">הוספה</button>
-        </div>
+        <div class="row2"><input type="text" id="newPersonName" placeholder="שם מלא"><button class="edit-btn" style="flex:0 0 auto;padding:9px 16px;" id="addPerson">הוספה</button></div>
       </div>
     </div>
 
@@ -526,9 +549,16 @@
     </div>
     <div class="row2">
       <div class="field">
-        <label>שעות</label>
-        <input type="number" id="ntHours" value="2" min="0" step="0.5">
+        <label>שעת התחלה</label>
+        <input type="text" id="ntStartTime" value="20:00" placeholder="HH:MM">
       </div>
+      <div class="field">
+        <label>שעת סיום</label>
+        <input type="text" id="ntEndTime" value="22:00" placeholder="HH:MM">
+      </div>
+    </div>
+    <div class="small-note" id="ntHoursPreview" style="margin-top:-4px;margin-bottom:8px;">סה״כ: 2 שעות</div>
+    <div class="row2">
       <div class="field">
         <label>נספרת במכסה האישית?</label>
         <select id="ntQuota">
@@ -621,6 +651,9 @@
     quotaByMonth: {},
     pin: "1234",
     roster: DEFAULT_ROSTER,
+    availability: {},
+    manualHours: [],
+    hourAdjustments: [],
     library: DEFAULT_LIBRARY,
     placements: {},      // dateStr -> [taskId,...]  (manually placed flex tasks)
     assignments: {},     // "dateStr::taskId" -> [names]
@@ -650,6 +683,43 @@
   function effectiveTime(ds, taskId, baseTime){
     const key = `${ds}::${taskId}`;
     return (state.timeOverride[key] !== undefined) ? state.timeOverride[key] : (baseTime || "");
+  }
+  function parseTimeMinutes(v){
+    if(!/^\d{1,2}:\d{2}$/.test(String(v||""))) return null;
+    const [h,m]=String(v).split(":").map(Number);
+    if(h>23||m>59) return null;
+    return h*60+m;
+  }
+  function hoursBetween(start,end){
+    const a=parseTimeMinutes(start), b=parseTimeMinutes(end);
+    if(a===null||b===null) return 0;
+    let diff=b-a;
+    if(diff<=0) diff+=1440;
+    return Math.round(diff/30)/2;
+  }
+  function addHoursToTimeLocal(timeStr, hours){
+    const a=parseTimeMinutes(timeStr);
+    if(a===null) return "";
+    let total=a+Math.round(Number(hours||0)*60);
+    total=((total%1440)+1440)%1440;
+    return `${pad(Math.floor(total/60))}:${pad(total%60)}`;
+  }
+  function effectiveEndTime(ds, taskId, task){
+    const key=`${ds}::${taskId}`;
+    if(state.endTimeOverride && state.endTimeOverride[key]!==undefined) return state.endTimeOverride[key];
+    if(task && task.endTime) return task.endTime;
+    return addHoursToTimeLocal(effectiveTime(ds,taskId,task?.time||""), effectiveHours(ds,taskId,task?.hours||0));
+  }
+  function syncTaskTimes(t){
+    if(!t.endTime){
+      const m=String(t.desc||"").match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);
+      if(m) t.endTime=m[2];
+      else if(t.time && t.hours) t.endTime=addHoursToTimeLocal(t.time,t.hours);
+      else t.endTime="";
+    }
+    if(t.time) t.time=String(t.time).padStart(5,"0");
+    if(t.endTime) t.endTime=String(t.endTime).padStart(5,"0");
+    if(t.time && t.endTime){ t.hours=hoursBetween(t.time,t.endTime); }
   }
   function taskTagLabel(t){
     if(t.notActivity) return "לא נחשבת כפעילות";
@@ -687,6 +757,11 @@
   }
 
   function applyLocalMigrations(){
+    if(!state.availability || typeof state.availability!=="object") state.availability={};
+    if(!Array.isArray(state.manualHours)) state.manualHours=[];
+    if(!Array.isArray(state.hourAdjustments)) state.hourAdjustments=[];
+    if(!state.endTimeOverride || typeof state.endTimeOverride!=="object") state.endTimeOverride={};
+    state.library.forEach(t=>{ if(t.active===undefined) t.active=true; syncTaskTimes(t); });
     if(!Array.isArray(state.deletedTaskIds)) state.deletedTaskIds = [];
     ensureQuotaMap();
     syncQuotaForView();
@@ -896,6 +971,7 @@
     const wd = new Date(y,m,d).getDay();
     const out = [];
     state.library.forEach(t=>{
+      if(t.active===false) return;
       if(t.date === ds){ out.push(t); return; }
       if(t.recurring !== null && t.recurring === wd){
         if(t.recurStart && ds < t.recurStart) return;
@@ -995,10 +1071,7 @@
               <span style="width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;"></span>
               <div style="font-weight:700;font-size:13px;">${t.name}</div>
             </div>
-            ${t.desc
-              ? `<div class="t-meta" style="color:var(--steel);margin-inline-start:16px;">${t.desc}${t.quota?'':' · '+taskTagLabel(t)}</div>`
-              : `<div class="t-meta" style="margin-inline-start:16px;">${tm? 'מ-'+tm+' · ':'שעה טרם נקבעה · '}${hrs} שעות${t.quota?'':' · '+taskTagLabel(t)}</div>`
-            }
+            <div class="t-meta" style="margin-inline-start:16px;">${tm? `${tm} - ${effectiveEndTime(ds,t.id,t)} · ${hrs} שעות`:'שעה טרם נקבעה'}${t.desc?' · '+t.desc:''}${t.quota?'':' · '+taskTagLabel(t)}</div>
             <div style="font-size:12.5px;margin-top:4px;margin-inline-start:16px;color:${names.length?'var(--ink)':'var(--red)'};">${namesTxt}</div>
           </div>
         `;
@@ -1049,7 +1122,7 @@
         const shown = inst.slice(0, MAX_SHOWN).map(t=>{
           const ok = assignedFor(ds,t.id).length > 0;
           const label = t.name.replace(/</g,"&lt;");
-          const hoursLabel = (t.desc || (t.time? t.time : '')).replace(/</g,"&lt;");
+          const hoursLabel = (t.time ? `${t.time} - ${effectiveEndTime(ds,t.id,t)}` : (t.desc||'')).replace(/</g,"&lt;");
           return `<div class="day-task-line"><span class="dot-mini ${ok?'ok':'warn'}"></span><span>${label}</span></div>${hoursLabel? `<div class="day-task-hours">${hoursLabel}</div>` : ''}`;
         }).join('');
         const extra = inst.length - MAX_SHOWN;
@@ -1076,14 +1149,16 @@
     list.innerHTML = "";
     state.roster.forEach(p=>{
       const {quotaHrs, extraHrs} = monthHoursForPerson(p.name);
-      const pct = Math.min(100, (quotaHrs / state.quota) * 100 || 0);
-      const barClass = quotaHrs >= state.quota ? (quotaHrs > state.quota ? "over":"full") : "";
+      const totalQuotaHrs = quotaHrs + manualHoursForPerson(p.name);
+      const unavailable = !isPersonAvailable(p.name);
+      const pct = Math.min(100, (totalQuotaHrs / state.quota) * 100 || 0);
+      const barClass = unavailable ? "" : (totalQuotaHrs >= state.quota ? (totalQuotaHrs > state.quota ? "over":"full") : "");
       const row = document.createElement("div");
       row.className = "prow";
       row.innerHTML = `
         <div class="pname">${p.role ? '<span class="star">★</span>' : ''}${p.name}</div>
         <div class="bar-wrap"><div class="bar ${barClass}" style="width:${pct}%"></div></div>
-        <div class="hrs">${quotaHrs}/${state.quota}ש׳${extraHrs? ' <span style="color:var(--amber)">+'+extraHrs+'</span>':''}</div>
+        <div class="hrs">${unavailable ? `פטור` : `${totalQuotaHrs}/${state.quota}ש׳`}${extraHrs? ' <span style="color:var(--amber)">+'+extraHrs+'</span>':''}</div>
       `;
       list.appendChild(row);
     });
@@ -1119,10 +1194,7 @@
         <div class="t-head">
           <div>
             <div class="t-name">${t.name}</div>
-            ${t.desc
-              ? `<div class="t-meta" style="margin-top:2px;color:var(--steel);">${t.desc}${t.quota?'':' · '+taskTagLabel(t)}</div>`
-              : `<div class="t-meta">${timeNow? 'מ-'+timeNow+' · ':'שעה טרם נקבעה · '}${hrsNow} שעות</div>`
-            }
+            <div class="t-meta" style="margin-top:2px;color:var(--steel);">${timeNow ? `${timeNow} - ${effectiveEndTime(currentDay.ds,t.id,t)} · ${hrsNow} שעות` : 'שעה טרם נקבעה'}${t.desc ? ' · '+t.desc : ''}${t.quota?'':' · '+taskTagLabel(t)}</div>
           </div>
           <span class="t-tag ${taskTagClass(t)}">${taskTagLabel(t)}</span>
         </div>
@@ -1145,46 +1217,53 @@
               <input type="text" value="${timeNow}" placeholder="HH:MM" data-role="time-override" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:7px 9px;font-size:13px;">
             </div>
             <div style="flex:1;">
-              <label style="font-size:11px;color:var(--steel-dim);display:block;margin-bottom:3px;">שעות ליום הזה בלבד</label>
-              <input type="number" min="0" step="0.5" value="${hrsNow}" data-role="hours-override" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:7px 9px;font-size:13px;">
+              <label style="font-size:11px;color:var(--steel-dim);display:block;margin-bottom:3px;">שעת סיום ליום הזה בלבד</label>
+              <input type="text" value="${effectiveEndTime(currentDay.ds,t.id,t)}" placeholder="HH:MM" data-role="end-time-override" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:7px 9px;font-size:13px;">
             </div>
           </div>
         `}
-        <button class="edit-btn" data-task="${t.id}" style="margin-top:9px;">${names.length? 'עריכת שיבוץ':'שיבוץ אנשים'}</button>
+        <div class="row2" style="margin-top:9px;">
+          <button class="edit-btn" data-task="${t.id}" style="margin-top:0;">${names.length? 'עריכת שיבוץ':'שיבוץ אנשים'}</button>
+          <button class="edit-btn" data-role="toggle-active" style="margin-top:0;background:${t.active===false?'var(--green)':'#fdf1f1'};border-color:${t.active===false?'var(--green)':'var(--red)'};color:${t.active===false?'#fff':'var(--red)'};">${t.active===false?'הפעלת המשימה':'השבתת המשימה'}</button>
+        </div>
         ${isManual ? `<button class="edit-btn" data-role="remove-day" style="background:#fdf1f1;border-color:var(--red);color:var(--red);margin-top:6px;">🗑 הסרת המשימה מהיום הזה</button>` : ''}
       `;
-      card.querySelector(".edit-btn").addEventListener("click", ()=>openPick(t));
+      card.querySelector('[data-task]').addEventListener("click", ()=>openPick(t));
+      const toggleActiveBtn=card.querySelector('[data-role="toggle-active"]');
+      if(toggleActiveBtn) toggleActiveBtn.addEventListener("click",()=>{
+        if(t.active===false){ t.active=true; } else {
+          if(!confirm(`להשבית את המשימה "${t.name}"? היא לא תופיע בשיבוצים חדשים עד שתופעל שוב.`)) return;
+          t.active=false;
+        }
+        saveState(); render(); renderDayTasks();
+      });
       card.querySelectorAll(".cal-btn").forEach(btn=>{
         btn.addEventListener("click", (e)=>{
           e.stopPropagation();
           addTaskToCalendar(t, currentDay.ds, btn.dataset.name);
         });
       });
-      const hoursOverrideInput = card.querySelector('[data-role="hours-override"]');
-      if(hoursOverrideInput) hoursOverrideInput.addEventListener("change",(e)=>{
-        const v = parseFloat(e.target.value);
-        const key = `${currentDay.ds}::${t.id}`;
-        if(!isNaN(v) && v>=0){
-          if(v === t.hours){ delete state.hoursOverride[key]; }
-          else{ state.hoursOverride[key] = v; }
-          saveState();
-          renderDayTasks();
-          renderSummary();
-        }
+      const endTimeOverrideInput = card.querySelector('[data-role="end-time-override"]');
+      if(endTimeOverrideInput) endTimeOverrideInput.addEventListener("change",(e)=>{
+        const v=e.target.value.trim();
+        const key=`${currentDay.ds}::${t.id}`;
+        if(v==="" || parseTimeMinutes(v)!==null){
+          if(v===(t.endTime||"")){ delete state.endTimeOverride[key]; }
+          else { state.endTimeOverride[key]=v; }
+          const st=effectiveTime(currentDay.ds,t.id,t.time);
+          if(st && v) t.hours=hoursBetween(st,v);
+          saveState(); renderDayTasks(); renderSummary(); renderCalendar();
+        } else { e.target.value=effectiveEndTime(currentDay.ds,t.id,t); alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM"); }
       });
       const timeOverrideInput = card.querySelector('[data-role="time-override"]');
       if(timeOverrideInput) timeOverrideInput.addEventListener("change",(e)=>{
-        const v = e.target.value.trim();
-        const key = `${currentDay.ds}::${t.id}`;
-        if(v === "" || /^\d{1,2}:\d{2}$/.test(v)){
-          if(v === (t.time||"")){ delete state.timeOverride[key]; }
-          else{ state.timeOverride[key] = v; }
-          saveState();
-          renderDayTasks();
-        } else {
-          e.target.value = timeNow;
-          alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM");
-        }
+        const v=e.target.value.trim();
+        const key=`${currentDay.ds}::${t.id}`;
+        if(v==="" || parseTimeMinutes(v)!==null){
+          if(v===(t.time||"")){ delete state.timeOverride[key]; }
+          else { state.timeOverride[key]=v; }
+          saveState(); renderDayTasks(); renderSummary(); renderCalendar();
+        } else { e.target.value=timeNow; alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM"); }
       });
       const removeBtn = card.querySelector('[data-role="remove-day"]');
       if(removeBtn){
@@ -1195,6 +1274,7 @@
               delete state.assignments[`${currentDay.ds}::${t.id}`];
               delete state.hoursOverride[`${currentDay.ds}::${t.id}`];
               delete state.timeOverride[`${currentDay.ds}::${t.id}`];
+              delete state.endTimeOverride[`${currentDay.ds}::${t.id}`];
               saveState();
               renderDayTasks();
               renderCalendar();
@@ -1214,7 +1294,9 @@
   // ---------- add flex task to day ----------
   document.getElementById("addFlexTask").addEventListener("click", ()=>{
     document.getElementById("quickTaskName").value = "";
-    document.getElementById("quickTaskHours").value = 2;
+    document.getElementById("quickTaskStartTime").value = "20:00";
+    document.getElementById("quickTaskEndTime").value = "22:00";
+    document.getElementById("quickTaskHoursPreview").textContent = "סה״כ: 2 שעות";
     document.getElementById("quickTaskQuota").value = "1";
     document.getElementById("quickTaskDesc").value = "";
     renderFlexChoices();
@@ -1246,14 +1328,26 @@
     });
   }
 
+  function updateQuickTaskHoursPreview(){
+    const a=document.getElementById("quickTaskStartTime").value.trim(), b=document.getElementById("quickTaskEndTime").value.trim();
+    const h=hoursBetween(a,b);
+    document.getElementById("quickTaskHoursPreview").textContent=h>0?`סה״כ: ${h} שעות`:"סה״כ: -";
+  }
+  document.getElementById("quickTaskStartTime").addEventListener("input",updateQuickTaskHoursPreview);
+  document.getElementById("quickTaskEndTime").addEventListener("input",updateQuickTaskHoursPreview);
+
   document.getElementById("quickTaskAdd").addEventListener("click", ()=>{
     const name = document.getElementById("quickTaskName").value.trim();
     if(!name){ alert("יש להזין שם למשימה"); return; }
-    const hours = parseFloat(document.getElementById("quickTaskHours").value) || 0;
+    const startTime=document.getElementById("quickTaskStartTime").value.trim();
+    const endTime=document.getElementById("quickTaskEndTime").value.trim();
+    if(parseTimeMinutes(startTime)===null || parseTimeMinutes(endTime)===null){alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM");return;}
+    const hours=hoursBetween(startTime,endTime);
+    if(hours<=0){alert("יש להזין שעת התחלה ושעת סיום תקינות");return;}
     const quota = document.getElementById("quickTaskQuota").value === "1";
     const desc = document.getElementById("quickTaskDesc").value.trim();
     const id = "c_" + Date.now();
-    const newTask = {id, name, hours, quota, date:null, recurring:null, custom:true, time:"20:00", desc};
+    const newTask = {id, name, hours, quota, date:null, recurring:null, custom:true, time:startTime, endTime:endTime, active:true, desc};
     state.library.push(newTask);
     if(!state.placements[currentDay.ds]) state.placements[currentDay.ds] = [];
     state.placements[currentDay.ds].push(id);
@@ -1275,7 +1369,7 @@
     pickTask = task;
     pickSelected = new Set(assignedFor(currentDay.ds, task.id));
     document.getElementById("pickTitle").textContent = task.name;
-    document.getElementById("pickMeta").textContent = `${currentDay.d} ב${HE_MONTHS[currentDay.m]} · ${effectiveHours(currentDay.ds, task.id, task.hours)} שעות${task.time ? ' · ' + effectiveTime(currentDay.ds, task.id, task.time) : ''} · ${task.notActivity ? 'לא נחשבת כפעילות, לא נספרת במכסה' : (task.quota?'נספר במכסה החודשית':'בחירה נוספת, לא נספר במכסה')}`;
+    document.getElementById("pickMeta").textContent = `${currentDay.d} ב${HE_MONTHS[currentDay.m]} · ${effectiveTime(currentDay.ds, task.id, task.time)||"--:--"} - ${effectiveEndTime(currentDay.ds, task.id, task)} · ${effectiveHours(currentDay.ds, task.id, task.hours)} שעות · ${task.notActivity ? 'לא נחשבת כפעילות, לא נספרת במכסה' : (task.quota?'נספר במכסה החודשית':'בחירה נוספת, לא נספר במכסה')}`;
     renderRosterPick();
     document.getElementById("pickOverlay").classList.add("show");
   }
@@ -1343,7 +1437,8 @@
     if(action === "settings"){
       renderQuotaTab();
       renderLibList();
-      renderRosterMgmt();
+      populateRosterMonthControls();
+  renderRosterMgmt();
       document.getElementById("pinCurrentShow").value = state.pin;
       document.getElementById("backupOut").value = JSON.stringify(state);
       document.getElementById("settingsOverlay").classList.add("show");
@@ -1474,13 +1569,15 @@
         </div>
         <div class="t-meta">${typeLabel}</div>
         <div class="li-controls">
-          <input type="number" min="0" step="0.5" value="${t.hours}" data-role="hours" ${t.fixed?'disabled':''}>
-          <span class="t-meta">שעות</span>
-          <input type="text" value="${t.time||''}" data-role="time" style="width:64px;padding:5px 6px;font-size:12px;" placeholder="טרם נקבע" ${t.fixed?'disabled':''}>
-          <span class="t-meta">שעת התחלה</span>
+          <button class="mini-toggle ${t.active!==false?'on':''}" data-role="active">${t.active!==false?'פעילה':'לא פעילה'}</button>
+          <input type="text" value="${t.time||''}" data-role="time" style="width:72px;padding:5px 6px;font-size:12px;" placeholder="HH:MM" ${t.fixed?'disabled':''}>
+          <span class="t-meta">התחלה</span>
+          <input type="text" value="${t.endTime||''}" data-role="end-time" style="width:72px;padding:5px 6px;font-size:12px;" placeholder="HH:MM" ${t.fixed?'disabled':''}>
+          <span class="t-meta">סיום</span>
+          <span class="t-meta" data-role="calc-hours" style="font-weight:800;">${t.time&&t.endTime?hoursBetween(t.time,t.endTime):0} שעות</span>
           <button class="mini-toggle ${t.quota?'on':''}" data-role="quota">${t.quota?'נספר במכסה':'בחירה נוספת'}</button>
         </div>
-        <div class="small-note" style="margin-top:4px;">${t.fixed ? '🔒 משימה קבועה - השעות מוגדרות מראש ואינן ניתנות לשינוי.' : 'אפשר להשאיר את שעת ההתחלה ריקה אם היא עוד לא ידועה, ולעדכן בהמשך.'}</div>
+        <div class="small-note" style="margin-top:4px;">${t.fixed ? '🔒 משימה קבועה - שעות ההתחלה והסיום מוגדרות מראש ואינן ניתנות לשינוי.' : 'הזן שעת התחלה ושעת סיום. מספר השעות מחושב אוטומטית.'}</div>
         ${t.recurring!==null ? `
         <div class="field" style="margin-top:8px;margin-bottom:0;">
           <label style="font-size:11px;">בתוקף רק בין התאריכים (ריק = ללא הגבלה, ירוץ גם בחודשים הבאים)</label>
@@ -1495,19 +1592,32 @@
           <input type="text" value="${t.desc||''}" data-role="desc" placeholder="לדוגמה: מפגש בכניסה הראשית">
         </div>
       `;
+      item.querySelector('[data-role="active"]').addEventListener("click",(e)=>{
+        t.active = t.active===false;
+        e.target.classList.toggle("on", t.active);
+        e.target.textContent = t.active ? "פעילה" : "לא פעילה";
+        saveState(); render(); renderLibList();
+      });
       item.querySelector('[data-role="name"]').addEventListener("change",(e)=>{
         const v = e.target.value.trim();
         if(v){ t.name=v; saveState(); render(); renderLibList(); }
         else e.target.value=t.name;
       });
-      item.querySelector('[data-role="hours"]').addEventListener("change",(e)=>{
-        const v = parseFloat(e.target.value);
-        if(!isNaN(v) && v>=0){ t.hours=v; saveState(); render(); }
-      });
       item.querySelector('[data-role="time"]').addEventListener("change",(e)=>{
-        const v = e.target.value.trim();
-        if(v === "" || /^\d{1,2}:\d{2}$/.test(v)){ t.time=v; saveState(); render(); }
-        else{ e.target.value = t.time||''; }
+        const v=e.target.value.trim();
+        if(v==="" || parseTimeMinutes(v)!==null){
+          t.time=v;
+          if(t.time && t.endTime) t.hours=hoursBetween(t.time,t.endTime);
+          saveState(); render(); renderLibList();
+        } else { e.target.value=t.time||""; alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM"); }
+      });
+      item.querySelector('[data-role="end-time"]').addEventListener("change",(e)=>{
+        const v=e.target.value.trim();
+        if(v==="" || parseTimeMinutes(v)!==null){
+          t.endTime=v;
+          if(t.time && t.endTime) t.hours=hoursBetween(t.time,t.endTime);
+          saveState(); render(); renderLibList();
+        } else { e.target.value=t.endTime||""; alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM"); }
       });
       const recurStartInput = item.querySelector('[data-role="recur-start"]');
       if(recurStartInput){
@@ -1554,47 +1664,56 @@
     });
   }
 
+  function rosterMonthKey(y=state.year,m=state.month){ return `${y}-${pad(m+1)}`; }
+  function availabilityForPerson(name,y=state.year,m=state.month){
+    if(!state.availability || typeof state.availability!=="object") state.availability={};
+    return state.availability[`${rosterMonthKey(y,m)}::${name}`] || {status:"available",reason:""};
+  }
+  function isPersonAvailable(name,y=state.year,m=state.month){ return availabilityForPerson(name,y,m).status==="available"; }
+  function manualHoursForPerson(name,y=state.year,m=state.month){
+    const added=(state.manualHours||[]).filter(x=>x.name===name&&Number(x.year)===Number(y)&&Number(x.month)===Number(m)).reduce((a,x)=>a+(Number(x.hours)||0),0);
+    const adjusted=(state.hourAdjustments||[]).filter(x=>x.name===name&&Number(x.year)===Number(y)&&Number(x.month)===Number(m)).reduce((a,x)=>a+(Number(x.hours)||0),0);
+    return added+adjusted;
+  }
+  function populateRosterMonthControls(){
+    const y=document.getElementById("rosterYear"),m=document.getElementById("rosterMonth"); if(!y||!m)return;
+    y.innerHTML=Array.from({length:5},(_,i)=>`<option value="${2026+i}">${2026+i}</option>`).join("");
+    m.innerHTML=HE_MONTHS.map((x,i)=>`<option value="${i}">${x}</option>`).join("");
+    y.value=String(Math.max(2026,Math.min(2030,state.year))); m.value=String(Math.max(0,Math.min(11,state.month)));
+    document.getElementById("rosterSelectedLabel").textContent=`סטטוס כוח האדם לחודש ${HE_MONTHS[Number(m.value)]} ${y.value}`;
+  }
+
   function renderRosterMgmt(){
-    const box = document.getElementById("rosterMgmt");
-    box.innerHTML = "";
-    state.roster.forEach((p,idx)=>{
-      const row = document.createElement("div");
-      row.className = "lib-item";
-      row.innerHTML = `
-        <div class="li-top">
-          <div class="li-name">${p.role?'★ ':''}${p.name}</div>
-          <button class="li-del">✕</button>
-        </div>
-      `;
-      row.querySelector(".li-del").addEventListener("click", ()=>{
-        const personName = p.name;
-        if(!confirm(`להסיר את ${personName} מהכיתה?`)) return;
-
-        // הסרת חבר משתמשת באימות PIN ישיר כדי למנוע תלות ב-pendingDeleteAction
-        // ובאירועי הממשק של חלון ה-PIN.
-        const enteredPin = prompt("הזן את קוד המפקד כדי להסיר את החבר:");
-        if(enteredPin === null) return;
-        if(enteredPin.trim() !== String(state.pin)){
-          alert("קוד שגוי");
-          return;
-        }
-
-        const removeIndex = state.roster.findIndex(person => person.name === personName);
-        if(removeIndex === -1){
-          alert("החבר כבר לא נמצא ברשימת כוח האדם.");
-          renderRosterMgmt();
-          return;
-        }
-
-        state.roster.splice(removeIndex,1);
-        saveState();
-        render();
-        renderRosterMgmt();
-        alert(`${personName} הוסר מרשימת כוח האדם.`);
-      });
+    const box=document.getElementById("rosterMgmt"); if(!box)return;
+    const y=Number(document.getElementById("rosterYear")?.value||state.year), m=Number(document.getElementById("rosterMonth")?.value??state.month);
+    document.getElementById("rosterSelectedLabel").textContent=`סטטוס כוח האדם לחודש ${HE_MONTHS[m]} ${y}`; box.innerHTML="";
+    state.roster.forEach(p=>{
+      const av=availabilityForPerson(p.name,y,m), row=document.createElement("div"); row.className="lib-item";
+      row.innerHTML=`<div class="li-top"><div class="li-name">${p.role?'★ ':''}${p.name}</div><button class="li-del">✕</button></div>
+      <div class="field" style="margin-top:8px;margin-bottom:7px;"><label>סטטוס לחודש ${HE_MONTHS[m]}</label><select class="roster-status">
+      <option value="available" ${av.status==='available'?'selected':''}>🟢 זמין - חייב במכסה</option><option value="reserve" ${av.status==='reserve'?'selected':''}>🟠 מילואים - פטור מהמכסה</option><option value="sick" ${av.status==='sick'?'selected':''}>🔴 מחלה - פטור מהמכסה</option><option value="other" ${av.status==='other'?'selected':''}>⚪ אחר - פטור מהמכסה</option></select></div>
+      <input class="roster-reason" type="text" value="${(av.reason||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" placeholder="הערה / סיבה (לא חובה)">`;
+      row.querySelector('.roster-status').onchange=e=>{state.availability[`${rosterMonthKey(y,m)}::${p.name}`]={...av,status:e.target.value};saveState();render();renderRosterMgmt();};
+      row.querySelector('.roster-reason').onchange=e=>{state.availability[`${rosterMonthKey(y,m)}::${p.name}`]={...av,reason:e.target.value.trim()};saveState();};
+      row.querySelector('.li-del').onclick=()=>{if(!confirm(`להסיר את ${p.name} מהכיתה?`))return;const pin=prompt("הזן את קוד המפקד כדי להסיר את החבר:");if(pin!==String(state.pin)){if(pin!==null)alert("קוד שגוי");return;}state.roster=state.roster.filter(x=>x.name!==p.name);saveState();render();renderRosterMgmt();};
       box.appendChild(row);
     });
+    const sel=document.getElementById("manualHourPerson"); if(sel)sel.innerHTML=state.roster.map(p=>`<option value="${p.name.replace(/"/g,'&quot;')}">${p.name}</option>`).join("");
+    const adj=document.getElementById("adjustHourPerson"); if(adj)adj.innerHTML=state.roster.map(p=>`<option value="${p.name.replace(/"/g,'&quot;')}">${p.name}</option>`).join("");
+    renderManualHoursList(y,m);
   }
+  function renderManualHoursList(y,m){
+    const box=document.getElementById("manualHoursList"); if(!box)return; const items=(state.manualHours||[]).filter(x=>Number(x.year)===y&&Number(x.month)===m);
+    const adj=(state.hourAdjustments||[]).filter(x=>Number(x.year)===y&&Number(x.month)===m);
+    const all=[...items.map(x=>({...x,_kind:'manual'})),...adj.map(x=>({...x,_kind:'adjust'}))];
+    box.innerHTML=all.length?all.map(x=>`<div class="lib-item"><div class="li-top"><div class="li-name">${x.name} - ${x.hours>0?'+':''}${x.hours} ש׳${x._kind==='adjust'?' <span style="color:var(--amber)">(תיקון)</span>':''}${x.reason?`<div class="t-meta">${x.reason}</div>`:""}</div><button class="li-del" data-mid="${x.id}" data-kind="${x._kind}">✕</button></div></div>`).join(""):"<div class=\"small-note\">אין שעות יזומות או תיקוני שעות לחודש הזה.</div>";
+    box.querySelectorAll('[data-mid]').forEach(b=>b.onclick=()=>{ if(b.dataset.kind==='adjust') state.hourAdjustments=(state.hourAdjustments||[]).filter(x=>x.id!==b.dataset.mid); else state.manualHours=state.manualHours.filter(x=>x.id!==b.dataset.mid); saveState();render();renderRosterMgmt();});
+  }
+
+  document.getElementById("rosterYear").addEventListener("change",()=>renderRosterMgmt());
+  document.getElementById("rosterMonth").addEventListener("change",()=>renderRosterMgmt());
+  document.getElementById("addManualHours").addEventListener("click",()=>{const name=document.getElementById("manualHourPerson").value,hours=Number(document.getElementById("manualHourValue").value),reason=document.getElementById("manualHourReason").value.trim(),y=Number(document.getElementById("rosterYear").value),m=Number(document.getElementById("rosterMonth").value);if(!name||!Number.isFinite(hours)||hours<=0){alert("יש לבחור חבר ולהזין מספר שעות חיובי");return;}state.manualHours.push({id:"mh_"+Date.now(),name,hours,reason,year:y,month:m});document.getElementById("manualHourValue").value=1;document.getElementById("manualHourReason").value="";saveState();render();renderRosterMgmt();});
+  document.getElementById("addHourAdjustment").addEventListener("click",()=>{const name=document.getElementById("adjustHourPerson").value,hours=Number(document.getElementById("adjustHourValue").value),reason=document.getElementById("adjustHourReason").value.trim(),y=Number(document.getElementById("rosterYear").value),m=Number(document.getElementById("rosterMonth").value);if(!name||!Number.isFinite(hours)||hours===0){alert("יש לבחור חבר ולהזין תיקון שונה מאפס");return;}state.hourAdjustments.push({id:"ha_"+Date.now(),name,hours,reason,year:y,month:m});document.getElementById("adjustHourValue").value=-1;document.getElementById("adjustHourReason").value="";saveState();render();renderRosterMgmt();});
 
   document.getElementById("pinChangeBtn").addEventListener("click", ()=>{
     const val = document.getElementById("pinNew").value.trim();
@@ -1665,7 +1784,9 @@
   // ---------- new task ----------
   document.getElementById("openNewTask").addEventListener("click", ()=>{
     document.getElementById("ntName").value = "";
-    document.getElementById("ntHours").value = 2;
+    document.getElementById("ntStartTime").value = "20:00";
+    document.getElementById("ntEndTime").value = "22:00";
+    document.getElementById("ntHoursPreview").textContent = "סה״כ: 2 שעות";
     document.getElementById("ntType").value = "flex";
     document.getElementById("ntDate").value = "";
     document.getElementById("ntQuota").value = "1";
@@ -1681,11 +1802,23 @@
     document.getElementById("ntDateField").style.display = e.target.value==="date" ? "block":"none";
     document.getElementById("ntWeekdayField").style.display = e.target.value==="recurring" ? "block":"none";
   });
+  function updateNewTaskHoursPreview(){
+    const a=document.getElementById("ntStartTime").value.trim(), b=document.getElementById("ntEndTime").value.trim();
+    const h=hoursBetween(a,b);
+    document.getElementById("ntHoursPreview").textContent = h>0 ? `סה״כ: ${h} שעות` : "סה״כ: -";
+  }
+  document.getElementById("ntStartTime").addEventListener("input",updateNewTaskHoursPreview);
+  document.getElementById("ntEndTime").addEventListener("input",updateNewTaskHoursPreview);
+
   document.getElementById("ntSave").addEventListener("click", ()=>{
     const name = document.getElementById("ntName").value.trim();
     if(!name){ alert("יש להזין שם משימה"); return; }
     const type = document.getElementById("ntType").value;
-    const hours = parseFloat(document.getElementById("ntHours").value) || 0;
+    const startTime = document.getElementById("ntStartTime").value.trim();
+    const endTime = document.getElementById("ntEndTime").value.trim();
+    if(parseTimeMinutes(startTime)===null || parseTimeMinutes(endTime)===null){ alert("פורמט שעה לא תקין. יש להשתמש ב-HH:MM"); return; }
+    const hours = hoursBetween(startTime,endTime);
+    if(hours<=0){ alert("יש להזין שעת התחלה ושעת סיום תקינות"); return; }
     const quota = document.getElementById("ntQuota").value === "1";
     const id = "c_" + Date.now();
     let date = null, recurring = null;
@@ -1697,7 +1830,7 @@
       recurring = parseInt(document.getElementById("ntWeekday").value, 10);
     }
     const desc = document.getElementById("ntDesc").value.trim();
-    state.library.push({id, name, hours, quota, date, recurring, custom:true, time:"20:00", desc});
+    state.library.push({id, name, hours, quota, date, recurring, custom:true, time:startTime, endTime:endTime, active:true, desc});
     saveState();
     document.getElementById("newTaskOverlay").classList.remove("show");
     render();
@@ -1811,8 +1944,10 @@
     const belowQuota = [];
     state.roster.forEach(p=>{
       const {quotaHrs} = monthHoursForPersonFor(p.name, y, m);
-      const rounded = Math.round(quotaHrs * 10) / 10;
-      const quota = Number(state.quota) || 0;
+      const rounded = Math.round((quotaHrs + manualHoursForPerson(p.name,y,m)) * 10) / 10;
+      const av=availabilityForPerson(p.name,y,m);
+      const quota = Number((state.quotaByMonth||{})[quotaKey(y,m)] ?? state.quota) || 0;
+      if(av.status !== "available") return;
       if(rounded === 0) noAssignment.push(p.name);
       if(rounded < quota){
         const gap = Math.round((quota - rounded) * 10) / 10;
@@ -1839,6 +1974,10 @@
     }
 
     lines.push("");
+    const unavailablePeople=[];
+    state.roster.forEach(p=>{const av=availabilityForPerson(p.name,y,m);if(av.status!=="available")unavailablePeople.push({name:p.name,status:av.status,reason:av.reason});});
+    if(unavailablePeople.length){lines.push("");lines.push(`⏸️ לא זמינים החודש (${unavailablePeople.length}):`);unavailablePeople.forEach(p=>{const label=p.status==='reserve'?'מילואים':p.status==='sick'?'מחלה':'אחר';lines.push(`• *${p.name}* - ${label}${p.reason?` (${p.reason})`:''}`);});}
+
     lines.push("━━━━━━━━━━━━━━");
     lines.push(`*📊 סיכום שיבוצים: ${assigned} שיבוצים | ${missing} חוסרים | ${total} משימות*`);
     if(missing === 0) lines.push("✅ אין חוסרים בשיבוץ");
